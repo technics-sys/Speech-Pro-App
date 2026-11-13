@@ -1,0 +1,2534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SpeechPro — Speech Therapy Management</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ── RESET & BASE ── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --teal:#2A7F7F;--teal-dark:#1d6666;--teal-light:#e8f4f4;
+  --ink:#1a1a2e;--ink-soft:#4a4a6a;--muted:#8888a8;
+  --sand:#f5f2ee;--sand-dark:#e8e4df;--white:#ffffff;
+  --border:#e8e4df;--green:#2a8a4a;--green-light:#e8f5ee;
+  --red:#c0392b;--red-light:#fdecea;--amber:#d4810a;--amber-light:#fef3e2;
+  --shadow:0 2px 16px rgba(42,127,127,0.10);
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--sand);color:var(--ink);min-height:100vh}
+
+/* ── AUTH / SIGN-IN (clinical split panel) ── */
+#auth-wrap{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;background:#fff}
+
+/* Left: the clinical wall */
+.auth-brand{background:#0F1E2E;color:#fff;padding:56px 52px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+.auth-brand::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 15% 0%,rgba(42,127,127,.20),transparent 55%);pointer-events:none}
+.ab-top{position:relative;z-index:1}
+.ab-mark{display:flex;align-items:center;gap:11px;margin-bottom:44px}
+.ab-dot{width:9px;height:9px;border-radius:50%;background:#2A7F7F;box-shadow:0 0 0 4px rgba(42,127,127,.18)}
+.ab-name{font-size:15px;font-weight:700;letter-spacing:.24em;text-transform:uppercase}
+.ab-head{font-size:34px;line-height:1.22;font-weight:300;letter-spacing:-.015em;max-width:12ch}
+.ab-head strong{font-weight:700;display:block;color:#7FD1D1}
+.ab-sub{margin-top:20px;font-size:14px;line-height:1.65;color:#93A6B8;max-width:34ch}
+
+/* Signature element: the waveform */
+.ab-wave{position:relative;z-index:1;margin:34px 0;height:52px}
+.ab-wave svg{width:100%;height:100%;overflow:visible}
+.ab-wave path{fill:none;stroke:#2A7F7F;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:1200;stroke-dashoffset:1200;animation:trace 3.4s cubic-bezier(.5,0,.2,1) .35s forwards}
+@keyframes trace{to{stroke-dashoffset:0}}
+@media(prefers-reduced-motion:reduce){.ab-wave path{animation:none;stroke-dashoffset:0}}
+
+/* Trust signals — set in the utility face, like an equipment label */
+.ab-foot{position:relative;z-index:1;border-top:1px solid rgba(255,255,255,.10);padding-top:20px}
+.ab-specs{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;letter-spacing:.02em;color:#6C8296;line-height:2.1}
+.ab-specs span{color:#2A7F7F;margin-right:9px}
+
+/* Right: the form */
+.auth-panel{display:flex;align-items:center;justify-content:center;padding:48px 40px;background:#fff}
+.auth-card{width:100%;max-width:376px}
+.auth-eyebrow{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#8FA3B4;margin-bottom:9px}
+.auth-title{font-size:25px;font-weight:600;color:#0F1E2E;letter-spacing:-.015em;margin-bottom:6px}
+.auth-lede{font-size:14px;color:#5A6B7D;line-height:1.55;margin-bottom:30px}
+
+.auth-tabs{display:flex;gap:26px;border-bottom:1px solid #E1E7ED;margin-bottom:26px}
+.auth-tab{padding:0 0 12px;cursor:pointer;font-size:13.5px;font-weight:500;color:#8FA3B4;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .16s,border-color .16s}
+.auth-tab:hover{color:#0F1E2E}
+.auth-tab.on{color:#0F1E2E;border-bottom-color:#2A7F7F;font-weight:600}
+
+.auth-fi{margin-bottom:17px}
+.auth-fi label{display:block;font-size:12.5px;font-weight:500;color:#3D4E5F;margin-bottom:6px}
+.auth-fi input{width:100%;padding:11px 13px;border:1px solid #D5DDE4;border-radius:6px;font-size:14.5px;font-family:inherit;color:#0F1E2E;background:#FBFCFD;outline:none;transition:border-color .16s,box-shadow .16s,background .16s}
+.auth-fi input::placeholder{color:#AEBCC8}
+.auth-fi input:focus{border-color:#2A7F7F;background:#fff;box-shadow:0 0 0 3px rgba(42,127,127,.11)}
+
+.auth-btn{width:100%;padding:12px;background:#0F1E2E;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;transition:background .16s;margin-top:8px}
+.auth-btn:hover{background:#1C3348}
+.auth-btn:disabled{background:#AEBCC8;cursor:not-allowed}
+.auth-btn:focus-visible{outline:2px solid #2A7F7F;outline-offset:2px}
+
+.auth-alt{text-align:center;font-size:13px;color:#2A7F7F;cursor:pointer;margin-top:16px;font-weight:500}
+.auth-alt:hover{text-decoration:underline}
+.auth-divider{text-align:center;font-size:12px;color:#AEBCC8;margin:16px 0}
+
+.auth-err{font-size:13px;color:#A03328;background:#FDF2F1;border-left:2px solid #C0392B;padding:10px 12px;border-radius:4px;margin-top:14px;display:none;line-height:1.5}
+.auth-msg{font-size:13px;color:#1E6B45;background:#F0F8F3;border-left:2px solid #2A8A4A;padding:10px 12px;border-radius:4px;margin-top:14px;display:none;line-height:1.5}
+
+.trial-note{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:11px;color:#5A6B7D;letter-spacing:.02em;margin-top:22px;padding-top:16px;border-top:1px solid #EDF1F4;line-height:1.9}
+.trial-note b{color:#0F1E2E;font-weight:600}
+
+@media(max-width:880px){
+  #auth-wrap{grid-template-columns:1fr}
+  .auth-brand{padding:36px 28px 30px}
+  .ab-mark{margin-bottom:26px}
+  .ab-head{font-size:26px}
+  .ab-wave{height:36px;margin:22px 0}
+  .auth-panel{padding:36px 28px 52px}
+}
+
+/* ── APP LAYOUT ── */
+#app{display:none;height:100vh;overflow:hidden;flex-direction:column}
+#topbar{background:var(--ink);color:white;padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:100}
+#topbar .logo{font-size:16px;font-weight:900;color:var(--teal);letter-spacing:-.3px}
+#topbar .tuser{font-size:12px;color:#9498b0;display:flex;align-items:center;gap:12px}
+#topbar .tuser strong{color:white}
+.tbtn{padding:5px 12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:white;font-size:11px;cursor:pointer;transition:all .12s}
+.tbtn:hover{background:rgba(255,255,255,0.15)}
+#body{display:flex;flex:1;overflow:hidden}
+#nav{width:200px;min-width:200px;background:white;border-right:1px solid var(--border);overflow-y:auto;padding:12px 0}
+.nav-item{padding:10px 18px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:var(--ink-soft);border-left:3px solid transparent;transition:all .12s}
+.nav-item:hover{background:var(--sand);color:var(--ink)}
+.nav-item.on{background:var(--teal-light);color:var(--teal);border-left-color:var(--teal);font-weight:700}
+.nav-item .ni{font-size:16px;width:20px;text-align:center}
+.nav-section{padding:14px 18px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+#main{flex:1;overflow-y:auto;background:var(--sand)}
+
+/* ── VIEWS ── */
+.view{display:none;height:100%}
+.view.on{display:block}
+.vh{padding:20px 24px 14px;background:white;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.vh h1{font-size:20px;font-weight:800;color:var(--ink)}
+.vh .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.vb{padding:20px 24px}
+
+/* ── CARDS & COMPONENTS ── */
+.card{background:white;border-radius:10px;padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
+.btn{padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .12s}
+.btn-p{background:var(--teal);color:white}.btn-p:hover{background:var(--teal-dark)}
+.btn-s{background:var(--sand);color:var(--ink);border:1px solid var(--border)}.btn-s:hover{background:var(--sand-dark)}
+.btn-d{background:var(--red-light);color:var(--red);border:1px solid #fbd0cc}.btn-d:hover{background:#fbd0cc}
+.btn-sm{padding:5px 10px;font-size:11px}
+.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
+.badge-green{background:var(--green-light);color:var(--green)}
+.badge-amber{background:var(--amber-light);color:var(--amber)}
+.badge-red{background:var(--red-light);color:var(--red)}
+.badge-teal{background:var(--teal-light);color:var(--teal-dark)}
+.fi{margin-bottom:12px}
+.fi label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);margin-bottom:4px}
+.fi input,.fi select,.fi textarea{width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit;outline:none;transition:border .15s;background:var(--sand)}
+.fi input:focus,.fi select:focus,.fi textarea:focus{border-color:var(--teal);background:white}
+.fi textarea{resize:vertical;min-height:80px}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg .full{grid-column:1/-1}
+.tb{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.sb{display:flex;align-items:center;gap:8px;background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;flex:1;min-width:180px}
+.sb input{border:none;outline:none;font-size:13px;background:transparent;width:100%}
+.fs{padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:white;outline:none;cursor:pointer}
+
+/* ── MODAL ── */
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;padding:16px}
+.mo.open{display:flex}
+.md{background:white;border-radius:14px;max-width:580px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 48px rgba(0,0,0,0.2)}
+.mh{padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.mh h2{font-size:16px;font-weight:800;color:var(--ink)}
+.xb{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);line-height:1}
+.mb{padding:18px 20px}
+.mf{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+/* ── PATIENT GRID ── */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.pc{background:white;border-radius:10px;padding:16px;cursor:pointer;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s;border:1.5px solid transparent}
+.pc:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(42,127,127,0.15);border-color:var(--teal-light)}
+.pname{font-size:15px;font-weight:700;color:var(--ink);margin-bottom:3px}
+.pmeta{font-size:12px;color:var(--muted);margin-bottom:8px}
+.ptags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+.ptag{font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--teal-light);color:var(--teal-dark)}
+.pfoot{display:flex;gap:12px;font-size:12px;color:var(--muted);justify-content:space-between;align-items:center}
+
+/* ── PATIENT TABS ── */
+.ptab-bar{display:flex;border-bottom:2px solid var(--border);background:white;padding:0 24px}
+.ptab{padding:12px 18px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+.ptab.on{color:var(--teal);border-bottom-color:var(--teal)}
+
+/* ── SESSIONS LIST ── */
+.slist{display:flex;flex-direction:column;gap:10px}
+.si{background:white;border-radius:9px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow)}
+.sdate{font-size:12px;font-weight:700;color:var(--teal);min-width:80px;text-align:center;background:var(--teal-light);padding:6px 8px;border-radius:7px}
+.sinfo{flex:1}
+.stitle{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:2px}
+.smeta{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:4px}
+.smeta span{background:var(--sand);padding:2px 7px;border-radius:8px}
+
+/* ── EMPTY STATE ── */
+.es{text-align:center;padding:48px 20px;color:var(--muted)}
+.ei{font-size:48px;margin-bottom:12px}
+.es h3{font-size:16px;font-weight:700;margin-bottom:6px;color:var(--ink-soft)}
+.es p{font-size:13px}
+
+/* ── DASHBOARD STATS ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:20px}
+.stat{background:white;border-radius:10px;padding:18px;box-shadow:var(--shadow)}
+.stat-val{font-size:28px;font-weight:900;color:var(--teal)}
+.stat-lbl{font-size:12px;color:var(--muted);margin-top:4px}
+
+/* ── PLAN BANNER ── */
+.plan-banner{background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:white;border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+.plan-banner h3{font-size:14px;font-weight:700}
+.plan-banner p{font-size:12px;opacity:.85;margin-top:2px}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:white;padding:10px 20px;border-radius:24px;font-size:13px;font-weight:600;z-index:9999;display:none;box-shadow:0 4px 24px rgba(0,0,0,0.3)}
+
+/* ── LOADING ── */
+#loader{position:fixed;inset:0;background:#0F1E2E;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px}
+#loader h2{color:#fff;font-size:14px;font-weight:700;letter-spacing:.24em;text-transform:uppercase}
+.spinner{width:30px;height:30px;border:2px solid rgba(255,255,255,.15);border-top-color:#2A7F7F;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── DETAIL VIEW ── */
+.dtab-bar{display:flex;border-bottom:2px solid var(--border);background:white;padding:0 24px;flex-shrink:0}
+.dtab{padding:10px 16px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s;white-space:nowrap}
+.dtab.on{color:var(--teal);border-bottom-color:var(--teal)}
+
+/* ── SCHEDULE ── */
+.appt-list{display:flex;flex-direction:column;gap:10px}
+.ai{background:white;border-radius:9px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow)}
+.adate{font-size:12px;font-weight:700;color:var(--teal-dark);min-width:80px;text-align:center;background:var(--teal-light);padding:6px 8px;border-radius:7px}
+.ainfo{flex:1}
+.aname{font-size:14px;font-weight:700;color:var(--ink)}
+.atype{font-size:12px;color:var(--muted)}
+
+/* ── PROFILE ── */
+.profile-section{background:white;border-radius:10px;padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
+.profile-section h3{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.color-picker{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.color-opt{width:28px;height:28px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all .12s}
+.color-opt.sel{border-color:var(--ink);transform:scale(1.15)}
+
+/* ── ASSESSMENTS ── */
+.apanel{background:white;border-radius:10px;border:1px solid var(--border);padding:28px;max-width:780px;box-shadow:var(--shadow)}
+.apanel h2{font-size:18px;font-weight:700;margin-bottom:4px}
+.apanel .aps{font-size:13px;color:var(--muted);margin-bottom:20px}
+.asec{margin-bottom:24px}
+.asec h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--teal);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--teal-light)}
+.aq{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.aq .aql{font-size:14px;font-weight:600}
+.aq .aqs{font-size:12px;color:var(--muted)}
+.lrow{display:flex;gap:6px;flex-wrap:wrap}
+.lb{padding:7px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:13px;cursor:pointer;background:white;color:var(--ink-soft);transition:all .12s}
+.lb:hover{border-color:var(--teal);background:var(--teal-light)}
+.lb.sel{border-color:var(--teal);background:var(--teal);color:#fff;font-weight:700}
+.ares{background:var(--teal-light);border-radius:10px;padding:20px 24px;margin-top:20px;border:1px solid #b2d8d8}
+.ares .arsc{font-size:42px;font-weight:900;color:var(--teal-dark);line-height:1}
+.ares .arl{font-size:14px;font-weight:700;color:var(--teal-dark);margin:4px 0}
+.ares .ari{font-size:13px;color:var(--ink-soft);line-height:1.5}
+.sv-mild{background:var(--green-light);border-color:#a9dfbf}
+.sv-mild .arsc,.sv-mild .arl{color:var(--green)}
+.sv-mod{background:var(--amber-light);border-color:#f9e4b7}
+.sv-mod .arsc,.sv-mod .arl{color:var(--amber)}
+.sv-sev{background:var(--red-light);border-color:#f5b7b1}
+.sv-sev .arsc,.sv-sev .arl{color:var(--red)}
+.atx{width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit;resize:vertical;min-height:70px;outline:none;background:var(--sand)}
+.atx:focus{border-color:var(--teal);background:white}
+.acard{background:white;border-radius:10px;padding:18px;box-shadow:var(--shadow);cursor:pointer;transition:transform .12s;border:1.5px solid transparent}
+.acard:hover{transform:translateY(-2px);border-color:var(--teal-light)}
+.cb{padding:2px}
+@media print{#topbar,#nav,.vh,.dtab-bar{display:none!important}#cr-content{border:none!important;padding:0!important}.card{box-shadow:none!important;border:none!important}}
+
+/* ── CALENDAR VIEWS ── */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.cal-hdr{background:var(--teal-dark);color:white;text-align:center;padding:8px 4px;font-size:12px;font-weight:700}
+.cal-day{background:white;min-height:90px;padding:6px;cursor:pointer;transition:background .1s}
+.cal-day:hover{background:var(--teal-light)}
+.cal-day.today{background:#fffbf0}
+.cal-day.other-month{background:var(--sand);opacity:.65}
+.cal-day .cal-dn{font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.cal-day.today .cal-dn{background:var(--teal);color:white}
+.cal-evt{font-size:10px;font-weight:600;padding:2px 5px;border-radius:4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-evt.e-sc{background:#dbeafe;color:#1e40af}
+.cal-evt.e-co{background:var(--green-light);color:var(--green)}
+.cal-evt.e-ca{background:var(--red-light);color:var(--red)}
+.cal-evt.e-ns{background:var(--amber-light);color:var(--amber)}
+.week-grid{display:grid;grid-template-columns:52px repeat(7,1fr);gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.week-hdr{background:var(--teal-dark);color:white;text-align:center;padding:8px 4px;font-size:11px;font-weight:700;border-left:1px solid rgba(255,255,255,0.1)}
+.week-hdr.today-col{background:var(--teal)}
+.week-time{background:var(--sand);text-align:right;padding:3px 6px;font-size:10px;color:var(--muted);border-top:1px solid var(--border)}
+.week-cell{background:white;min-height:36px;padding:2px 3px;border-top:1px solid var(--sand-dark);border-left:1px solid var(--sand-dark)}
+.week-cell.today-col{background:#fffdf0}
+.ai{background:white;border-radius:9px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow);margin-bottom:10px}
+.at{font-size:12px;font-weight:700;color:var(--teal-dark);min-width:80px;text-align:center;background:var(--teal-light);padding:6px 8px;border-radius:7px}
+.ainfo{flex:1}
+.ap{font-size:14px;font-weight:700;color:var(--ink)}
+.aty{font-size:12px;color:var(--muted)}
+.sb2{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.s-sc{background:#EBF5FB;color:#1A5276}
+.s-co{background:var(--green-light);color:var(--green)}
+.s-ca{background:var(--red-light);color:var(--red)}
+.s-ns{background:var(--amber-light);color:var(--amber)}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="spinner"></div>
+  <h2>SpeechPro</h2>
+</div>
+
+<!-- AUTH -->
+<div id="auth-wrap" style="display:none">
+
+  <!-- Left: clinical identity panel -->
+  <aside class="auth-brand">
+    <div class="ab-top">
+      <div class="ab-mark">
+        <span class="ab-dot"></span>
+        <span class="ab-name">SpeechPro</span>
+      </div>
+      <h1 class="ab-head">Clinical records,<strong>kept in order.</strong></h1>
+      <p class="ab-sub">Practice management for speech and language therapists. Patients, sessions, assessments and reports in one secure record.</p>
+    </div>
+
+    <!-- Signature: a speech waveform, traced on load -->
+    <div class="ab-wave" aria-hidden="true">
+      <svg viewBox="0 0 460 52" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0,26 L34,26 L44,26 L52,14 L60,38 L68,20 L76,32 L84,26 L118,26
+                 L126,22 L134,30 L142,10 L150,42 L158,18 L166,34 L174,24 L182,28 L190,26
+                 L224,26 L232,26 L240,16 L248,36 L256,26 L290,26
+                 L298,20 L306,32 L314,12 L322,40 L330,22 L338,30 L346,26 L380,26
+                 L388,24 L396,28 L404,26 L460,26"/>
+      </svg>
+    </div>
+
+    <div class="ab-foot">
+      <div class="ab-specs">
+        <div><span>&#9679;</span>Encrypted in transit and at rest</div>
+        <div><span>&#9679;</span>Records visible only to the treating therapist</div>
+        <div><span>&#9679;</span>Full export and erasure on request</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right: the form -->
+  <main class="auth-panel">
+    <div class="auth-card">
+      <div class="auth-eyebrow">Practitioner access</div>
+      <h2 class="auth-title">Sign in to your practice</h2>
+      <p class="auth-lede" id="auth-lede">Your patient records are private to your account.</p>
+
+      <div class="auth-tabs">
+        <div class="auth-tab on" onclick="authTab('login')">Sign in</div>
+        <div class="auth-tab" onclick="authTab('signup')">Create account</div>
+      </div>
+
+      <!-- SIGN IN -->
+      <div id="auth-login">
+        <div class="auth-fi"><label for="l-email">Username</label><input id="l-email" type="text" autocomplete="username" placeholder="Your username"></div>
+        <div class="auth-fi"><label for="l-pass">Password</label><input id="l-pass" type="password" autocomplete="current-password" placeholder="Enter your password"></div>
+        <button class="auth-btn" onclick="doLogin()">Sign in</button>
+        <div class="auth-alt" onclick="authTab('reset')">Forgotten your password?</div>
+        <div class="auth-err" id="l-err"></div>
+      </div>
+
+      <!-- CREATE ACCOUNT -->
+      <div id="auth-signup" style="display:none">
+        <div class="auth-fi"><label for="s-name">Full name</label><input id="s-name" autocomplete="name" placeholder="Dr Sarah Johnson"></div>
+        <div class="auth-fi"><label for="s-clinic">Clinic or practice</label><input id="s-clinic" autocomplete="organization" placeholder="Optional"></div>
+        <div class="auth-fi"><label for="s-email">Email</label><input id="s-email" type="email" autocomplete="email" placeholder="you@practice.com"></div>
+        <div class="auth-fi"><label for="s-pass">Password</label><input id="s-pass" type="password" autocomplete="new-password" placeholder="At least 8 characters"></div>
+        <div class="auth-fi"><label for="s-pass2">Confirm password</label><input id="s-pass2" type="password" autocomplete="new-password" placeholder="Re-enter your password"></div>
+        <button class="auth-btn" onclick="doSignup()">Create account</button>
+        <div class="auth-err" id="s-err"></div>
+        <div class="auth-msg" id="s-msg"></div>
+        <div class="trial-note">
+          <div><b>30 days free.</b> No card required.</div>
+          <div>Plans from Rs 2,500 per month after the trial.</div>
+        </div>
+      </div>
+
+      <!-- RESET -->
+      <div id="auth-reset" style="display:none">
+        <p class="auth-lede" style="margin-bottom:20px">Enter your email and we will send you a link to set a new password.</p>
+        <div class="auth-fi"><label for="r-email">Email</label><input id="r-email" type="email" autocomplete="email" placeholder="you@practice.com"></div>
+        <button class="auth-btn" onclick="doReset()">Send reset link</button>
+        <div class="auth-alt" onclick="authTab('login')">Back to sign in</div>
+        <div class="auth-err" id="r-err"></div>
+        <div class="auth-msg" id="r-msg"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div id="topbar">
+    <div class="logo">SpeechPro</div>
+    <div class="tuser">
+      <span>Welcome, <strong id="t-name">Therapist</strong></span>
+      <span id="t-plan" class="badge badge-teal">Trial</span>
+      <button class="tbtn" onclick="nav('profile')">⚙ Settings</button>
+      <button class="tbtn" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
+  <div id="body">
+    <div id="nav">
+      <div class="nav-section">Main</div>
+      <div class="nav-item on" onclick="nav('dashboard')"><span class="ni">📊</span>Dashboard</div>
+      <div class="nav-item" onclick="nav('patients')"><span class="ni">👥</span>Patients</div>
+      <div class="nav-item" onclick="nav('schedule')"><span class="ni">📅</span>Schedule</div>
+      <div class="nav-section">Clinical</div>
+      <div class="nav-item" onclick="nav('assessments')"><span class="ni">🩺</span>Assessments</div>
+      <div class="nav-item" onclick="nav('reports')"><span class="ni">📄</span>Reports</div>
+      <div class="nav-section">Account</div>
+      <div class="nav-item" onclick="nav('profile')"><span class="ni">⚙️</span>Settings</div>
+      <div id="nav-admin-section" style="display:none">
+        <div class="nav-section">Administration</div>
+        <div class="nav-item" onclick="nav('admin')"><span class="ni">🛡️</span>Admin Console</div>
+      </div>
+    </div>
+    <div id="main">
+
+      <!-- DASHBOARD -->
+      <div class="view on" id="view-dashboard">
+        <div class="vh"><div><h1>Dashboard</h1><div class="sub" id="dash-date"></div></div></div>
+        <div class="vb">
+          <div id="plan-banner"></div>
+          <div class="stats" id="dash-stats">
+            <div class="stat"><div class="stat-val" id="s-patients">—</div><div class="stat-lbl">Active Patients</div></div>
+            <div class="stat"><div class="stat-val" id="s-sessions">—</div><div class="stat-lbl">Sessions This Month</div></div>
+            <div class="stat"><div class="stat-val" id="s-appts">—</div><div class="stat-lbl">Upcoming Appointments</div></div>
+            <div class="stat"><div class="stat-val" id="s-goals">—</div><div class="stat-lbl">Active Goals</div></div>
+          </div>
+          <div class="card">
+            <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:12px">Today's Appointments</div>
+            <div id="dash-today"></div>
+          </div>
+          <div class="card">
+            <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:12px">Recent Patients</div>
+            <div id="dash-recent"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PATIENTS -->
+      <div class="view" id="view-patients">
+        <div class="vh">
+          <div><h1>Patients</h1><div class="sub" id="p-sub"></div></div>
+          <div><button class="btn btn-p" onclick="openModal('m-patient')">＋ Add Patient</button></div>
+        </div>
+        <div class="ptab-bar">
+          <div class="ptab on" id="ptab-adult" onclick="switchPTab('adult')">👤 Adult</div>
+          <div class="ptab" id="ptab-pediatric" onclick="switchPTab('pediatric')">🧒 Pediatric</div>
+          <div class="ptab" id="ptab-discharged" onclick="switchPTab('discharged')">✅ Discharged</div>
+        </div>
+        <div class="vb">
+          <div class="tb">
+            <div class="sb"><span>🔍</span><input id="p-search" placeholder="Search patients…" oninput="renderPatients()"></div>
+            <select class="fs" id="p-cond" onchange="renderPatients()">
+              <option value="">All Conditions</option>
+              <option value="stuttering">Stuttering</option>
+              <option value="articulation">Articulation</option>
+              <option value="language">Language Delay</option>
+              <option value="voice">Voice Disorder</option>
+              <option value="aphasia">Aphasia</option>
+              <option value="stroke">Stroke</option>
+            </select>
+          </div>
+          <div class="pgrid" id="pgrid"></div>
+        </div>
+      </div>
+
+      <!-- PATIENT DETAIL -->
+      <div class="view" id="view-detail">
+        <div id="detail-header"></div>
+        <div class="dtab-bar">
+          <div class="dtab on" onclick="switchDTab('overview')">Overview</div>
+          <div class="dtab" onclick="switchDTab('sessions')">Sessions</div>
+          <div class="dtab" onclick="switchDTab('goals')">Goals</div>
+          <div class="dtab" onclick="switchDTab('appointments')">Appointments</div>
+          <div class="dtab" onclick="switchDTab('assessments')">Assessments</div>
+        </div>
+        <div class="vb" id="detail-body"></div>
+      </div>
+
+      <!-- SCHEDULE -->
+      <div class="view" id="view-schedule">
+        <div class="vh">
+          <div><h1>Schedule</h1><div class="sub">Appointments & attendance</div></div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div style="display:flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden">
+              <button id="sv-list" onclick="switchSchedView('list')" style="padding:7px 14px;border:none;background:var(--teal);color:white;font-size:12px;font-weight:600;cursor:pointer">≡ List</button>
+              <button id="sv-week" onclick="switchSchedView('week')" style="padding:7px 14px;border:none;background:white;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;border-left:1px solid var(--border)">Week</button>
+              <button id="sv-month" onclick="switchSchedView('month')" style="padding:7px 14px;border:none;background:white;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;border-left:1px solid var(--border)">Month</button>
+            </div>
+            <button class="btn btn-p" onclick="openAddAppt()">＋ Add Appointment</button>
+          </div>
+        </div>
+        <div class="vb">
+          <div class="tb" id="sched-list-toolbar">
+            <div class="sb"><span>🔍</span><input id="a-search" placeholder="Search…" oninput="renderSchedule()"></div>
+            <select class="fs" id="a-filt" onchange="renderSchedule()">
+              <option value="">All Status</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="no-show">No Show</option>
+            </select>
+          </div>
+          <div class="tb" id="sched-cal-toolbar" style="display:none;align-items:center;gap:10px">
+            <button class="btn btn-s btn-sm" onclick="calNav(-1)">‹ Prev</button>
+            <button class="btn btn-s btn-sm" onclick="calGoToday()">Today</button>
+            <button class="btn btn-s btn-sm" onclick="calNav(1)">Next ›</button>
+            <div id="cal-title" style="font-size:15px;font-weight:700;color:var(--ink);margin-left:8px"></div>
+          </div>
+          <div id="sched-list"></div>
+        </div>
+      </div>
+
+      <!-- ASSESSMENTS -->
+      <div class="view" id="view-assessments">
+        <div class="vh"><div><h1>Assessments</h1><div class="sub" id="assess-sub">Clinical screening tools</div></div><div id="assess-acts"></div></div>
+        <div class="vb"><div id="assess-body"></div></div>
+      </div>
+
+      <!-- REPORTS -->
+      <div class="view" id="view-reports">
+        <div class="vh"><div><h1>Reports</h1><div class="sub" id="rep-sub">Analytics & clinical summaries</div></div></div>
+        <div class="dtab-bar">
+          <div class="dtab on" id="rt-analytics" onclick="switchRepTab('analytics')">📊 Analytics</div>
+          <div class="dtab" id="rt-clinical" onclick="switchRepTab('clinical')">🧾 Clinical Report</div>
+        </div>
+        <div class="vb" id="rep-body"></div>
+      </div>
+
+      <!-- PROFILE / SETTINGS -->
+      <div class="view" id="view-profile">
+        <div class="vh"><div><h1>Settings</h1><div class="sub">Your profile & subscription</div></div></div>
+        <div class="vb">
+          <div class="profile-section">
+            <h3>Therapist Profile</h3>
+            <div class="fg">
+              <div class="fi"><label>Full Name</label><input id="pr-name" placeholder="Dr. Sarah Johnson"></div>
+              <div class="fi"><label>Clinic Name</label><input id="pr-clinic" placeholder="Clear Speech Clinic"></div>
+              <div class="fi"><label>Credentials</label><input id="pr-creds" placeholder="BSc (Hons) Speech Therapy"></div>
+              <div class="fi"><label>Registration Number</label><input id="pr-reg" placeholder="SLT12345"></div>
+              <div class="fi"><label>Phone</label><input id="pr-phone" placeholder="+230 5912 3456"></div>
+              <div class="fi"><label>Email</label><input id="pr-email" type="email" placeholder="your@email.com"></div>
+            </div>
+            <button class="btn btn-p" onclick="saveProfile()">Save Profile</button>
+          </div>
+          <div class="profile-section">
+            <h3>Subscription</h3>
+            <div id="sub-info"></div>
+          </div>
+          <div class="profile-section">
+            <h3>Data & Privacy</h3>
+            <div style="font-size:13px;color:var(--ink-soft);line-height:1.7;margin-bottom:14px">
+              Your patient data is encrypted and stored securely. You can export or delete your data at any time in compliance with GDPR/DPA regulations.
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-s" onclick="exportData()">📥 Export All My Data</button>
+              <button class="btn btn-d" onclick="requestDelete()">🗑 Delete My Account</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN CONSOLE -->
+      <div class="view" id="view-admin">
+        <div class="vh"><div><h1>🛡️ Admin Console</h1><div class="sub">Manage all therapist accounts & subscriptions</div></div></div>
+        <div class="vb">
+          <!-- Stats -->
+          <div class="stats" id="admin-stats">
+            <div class="stat"><div class="stat-val" id="as-total">—</div><div class="stat-lbl">Total Therapists</div></div>
+            <div class="stat"><div class="stat-val" id="as-trial">—</div><div class="stat-lbl">On Trial</div></div>
+            <div class="stat"><div class="stat-val" id="as-paid">—</div><div class="stat-lbl">Paid Active</div></div>
+            <div class="stat"><div class="stat-val" id="as-mrr">—</div><div class="stat-lbl">Monthly Revenue</div></div>
+          </div>
+          <!-- Filters -->
+          <div class="tb">
+            <div class="sb"><span>🔍</span><input id="admin-search" placeholder="Search by name or email…" oninput="renderAdmin()"></div>
+            <select class="fs" id="admin-filter" onchange="renderAdmin()">
+              <option value="">All Accounts</option>
+              <option value="trial_active">Trial Active</option>
+              <option value="trial_expired">Trial Expired</option>
+              <option value="paid_active">Paid Active</option>
+              <option value="suspended">Suspended</option>
+            </select>
+            <button class="btn btn-s" onclick="renderAdmin()">↻ Refresh</button>
+          </div>
+          <!-- User table -->
+          <div class="card" style="padding:0;overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead>
+                <tr style="background:var(--sand);text-align:left">
+                  <th style="padding:12px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Therapist</th>
+                  <th style="padding:12px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Status</th>
+                  <th style="padding:12px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Plan</th>
+                  <th style="padding:12px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Usage</th>
+                  <th style="padding:12px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Joined</th>
+                  <th style="padding:12px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end main -->
+  </div><!-- end body -->
+</div><!-- end app -->
+
+<!-- ADMIN: MANAGE USER MODAL -->
+<div class="mo" id="m-admin-user">
+  <div class="md">
+    <div class="mh"><h2 id="au-title">Manage User</h2><button class="xb" onclick="closeModal('m-admin-user')">✕</button></div>
+    <div class="mb" id="au-body"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- MODALS -->
+<div class="mo" id="m-patient">
+  <div class="md">
+    <div class="mh"><h2 id="m-patient-title">Add Patient</h2><button class="xb" onclick="closeModal('m-patient')">✕</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fi"><label>First Name *</label><input id="pf"></div>
+        <div class="fi"><label>Last Name *</label><input id="pl"></div>
+        <div class="fi"><label>Date of Birth</label><input id="pd" type="date"></div>
+        <div class="fi"><label>Gender</label>
+          <select id="pg"><option>Select…</option><option>Male</option><option>Female</option><option>Other</option><option>Prefer not to say</option></select>
+        </div>
+        <div class="fi"><label>Patient Type</label>
+          <select id="ptype"><option value="adult">Adult</option><option value="pediatric">Pediatric</option></select>
+        </div>
+        <div class="fi"><label>Status</label>
+          <select id="pstatus"><option value="active">Active</option><option value="discharged">Discharged</option></select>
+        </div>
+        <div class="fi"><label>Phone</label><input id="pp" placeholder="+230…"></div>
+        <div class="fi"><label>Email</label><input id="pe" type="email"></div>
+        <div class="fi full"><label>Referral</label><input id="pr-ref" placeholder="Dr. Name or hospital"></div>
+        <div class="fi full"><label>Conditions</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+            <label style="font-size:12px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="c1" value="stuttering"> Stuttering</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="c2" value="articulation"> Articulation</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="c3" value="language"> Language Delay</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="c4" value="voice"> Voice Disorder</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="c5" value="aphasia"> Aphasia</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:5px"><input type="checkbox" id="c6" value="stroke"> Stroke</label>
+          </div>
+        </div>
+        <div class="fi full"><label>Notes</label><textarea id="pnotes" placeholder="Background, history, presenting concerns…"></textarea></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-s" onclick="closeModal('m-patient')">Cancel</button>
+      <button class="btn btn-p" onclick="savePatient()">Save Patient</button>
+    </div>
+  </div>
+</div>
+
+<div class="mo" id="m-session">
+  <div class="md">
+    <div class="mh"><h2>Log Session</h2><button class="xb" onclick="closeModal('m-session')">✕</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fi"><label>Patient *</label><select id="ss-pat"><option value="">Select…</option></select></div>
+        <div class="fi"><label>Date *</label><input id="ss-date" type="date"></div>
+        <div class="fi"><label>Title</label><input id="ss-title" placeholder="Therapy Session"></div>
+        <div class="fi"><label>Duration (min)</label><input id="ss-dur" type="number" value="45"></div>
+        <div class="fi"><label>Score (%)</label><input id="ss-score" type="number" min="0" max="100"></div>
+        <div class="fi"><label>Progress</label>
+          <select id="ss-prog"><option value="">Select…</option><option>Excellent</option><option>Good</option><option>Moderate</option><option>Limited</option><option>Regression</option></select>
+        </div>
+        <div class="fi"><label>Location</label>
+          <select id="ss-loc"><option value="">Select…</option></select>
+        </div>
+        <div class="fi full"><label>Notes</label><textarea id="ss-notes"></textarea></div>
+        <div class="fi full"><label>Homework</label><textarea id="ss-hw" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-s" onclick="closeModal('m-session')">Cancel</button>
+      <button class="btn btn-p" onclick="saveSession()">Save Session</button>
+    </div>
+  </div>
+</div>
+
+<div class="mo" id="m-appt-view">
+  <div class="md" style="max-width:440px">
+    <div class="mh"><h2>Appointment</h2><button class="xb" onclick="closeModal('m-appt-view')">✕</button></div>
+    <div class="mb" id="m-appt-view-body"></div>
+  </div>
+</div>
+
+<div class="mo" id="m-appt">
+  <div class="md">
+    <div class="mh"><h2>Add Appointment</h2><button class="xb" onclick="closeModal('m-appt')">✕</button></div>
+    <div class="mb">
+      <div class="fg">
+        <div class="fi"><label>Patient *</label><select id="ap-pat"><option value="">Select…</option></select></div>
+        <div class="fi"><label>Date *</label><input id="ap-date" type="date"></div>
+        <div class="fi"><label>Time</label><input id="ap-time" type="time"></div>
+        <div class="fi"><label>Type</label>
+          <select id="ap-type"><option>Initial Assessment</option><option>Therapy Session</option><option>Progress Review</option><option>Parent Consultation</option><option>Discharge</option></select>
+        </div>
+        <div class="fi"><label>Status</label>
+          <select id="ap-status"><option value="scheduled">Scheduled</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="no-show">No Show</option></select>
+        </div>
+        <div class="fi"><label>Location</label>
+          <select id="ap-loc"><option value="">Select…</option></select>
+        </div>
+        <div class="fi full"><label>Notes</label><textarea id="ap-notes" rows="2"></textarea></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-s" onclick="closeModal('m-appt')">Cancel</button>
+      <button class="btn btn-p" onclick="saveAppt()">Save Appointment</button>
+    </div>
+  </div>
+</div>
+
+<div class="mo" id="m-goal">
+  <div class="md">
+    <div class="mh"><h2>Add Goal</h2><button class="xb" onclick="closeModal('m-goal')">✕</button></div>
+    <div class="mb">
+      <div class="fi"><label>Goal *</label><textarea id="g-text" placeholder="Describe the therapy goal…"></textarea></div>
+      <div class="fg">
+        <div class="fi"><label>Priority</label>
+          <select id="g-pri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select>
+        </div>
+        <div class="fi"><label>Target Date</label><input id="g-date" type="date"></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-s" onclick="closeModal('m-goal')">Cancel</button>
+      <button class="btn btn-p" onclick="saveGoal()">Add Goal</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  SUPABASE CONFIG
+//  Replace with your own from supabase.com
+// ═══════════════════════════════════════════════
+var SUPABASE_URL = 'https://xwgxiwaicwraemrptwdi.supabase.co/rest/v1/';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3Z3hpd2FpY3dyYWVtcnB0d2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxODMyNjQsImV4cCI6MjA5ODc1OTI2NH0.WfoF5tOqfHJojdIcqjcsFjzNfAqKGbHyOeHgK5nR7DQ';
+// ═══════════════════════════════════════════════
+
+// Show a clear message instead of a blank loop if something is wrong at startup.
+function fatalStartup(msg){
+  var el=document.getElementById('loader');
+  if(el){
+    el.innerHTML='<div style="max-width:420px;text-align:center;color:#fff;padding:24px;font-family:system-ui,sans-serif">'+
+      '<div style="font-size:28px;margin-bottom:12px">⚠️</div>'+
+      '<div style="font-size:15px;font-weight:700;letter-spacing:.1em;margin-bottom:10px">SPEECHPRO CAN’T START</div>'+
+      '<div style="font-size:13px;line-height:1.6;color:#AEBCC8">'+msg+'</div></div>';
+  } else {
+    alert('SpeechPro can’t start: '+msg.replace(/<[^>]+>/g,' '));
+  }
+}
+
+var sb=null;
+try{
+  if(typeof supabase==='undefined'||!supabase.createClient){
+    throw new Error('nolib');
+  }
+  if(!SUPABASE_URL||SUPABASE_URL.indexOf('YOUR_')===0||SUPABASE_URL.indexOf('http')!==0||
+     !SUPABASE_KEY||SUPABASE_KEY.indexOf('YOUR_')===0){
+    throw new Error('nocreds');
+  }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}catch(e){
+  if(e.message==='nolib'){
+    fatalStartup('Couldn’t load the secure connection library. This app needs an internet connection — please open it online, not from a saved file.');
+  } else if(e.message==='nocreds'){
+    fatalStartup('The database connection hasn’t been set up. The SUPABASE_URL and SUPABASE_KEY values still need to be filled in.');
+  } else {
+    fatalStartup('Startup error: '+e.message);
+  }
+}
+
+var curUser = null;
+var curProfile = null;
+var curPatient = null;
+var curPTab = 'adult';
+var curDTab = 'overview';
+
+var LOCATIONS = ['Welkin Clinic','C-Care Darne','Premium Care Phoenix','Home Visit','Private Practice','Les Jardins De Chantenay'];
+var COND_LABELS = {stuttering:'Stuttering',articulation:'Articulation',language:'Language Delay',voice:'Voice Disorder',aphasia:'Aphasia',stroke:'Stroke'};
+var COLORS = ['#2A7F7F','#e05c5c','#5c9ee0','#8e5ce0','#e07a5c','#5ce08a','#e0c45c','#e05ca8'];
+
+// ── INIT ─────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async function(){
+  if(!sb) return; // a startup message is already showing
+  try{
+    var {data:{session}} = await sb.auth.getSession();
+    if(session){
+      curUser = session.user;
+      await loadProfile();
+      showApp();
+    } else {
+      showAuth();
+    }
+    document.getElementById('loader').style.display='none';
+    sb.auth.onAuthStateChange(function(event, session){
+      if(event==='SIGNED_IN'){ curUser=session.user; loadProfile().then(showApp); }
+      if(event==='SIGNED_OUT'){ curUser=null; curProfile=null; showAuth(); }
+    });
+  }catch(e){
+    fatalStartup('Couldn’t reach the database. Please check your internet connection and that the Supabase details are correct.<br><br><span style="font-size:11px;opacity:.7">'+(e.message||'')+'</span>');
+  }
+});
+
+function showApp(){
+  document.getElementById('auth-wrap').style.display='none';
+  document.getElementById('app').style.display='flex';
+  fillLocations();
+  nav('dashboard');
+}
+
+function showAuth(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('auth-wrap').style.display='grid';
+}
+
+// ── AUTH ──────────────────────────────────────────
+function authTab(t){
+  document.getElementById('auth-login').style.display='none';
+  document.getElementById('auth-signup').style.display='none';
+  document.getElementById('auth-reset').style.display='none';
+  document.getElementById('auth-'+t).style.display='block';
+  // On the reset screen, keep Sign in marked as the section we came from
+  var active = (t==='reset') ? 'login' : t;
+  document.querySelectorAll('.auth-tab').forEach(function(el,i){
+    el.classList.toggle('on', ['login','signup'][i]===active);
+  });
+  var title=document.querySelector('.auth-title');
+  var lede=document.getElementById('auth-lede');
+  if(title){
+    title.textContent = t==='signup' ? 'Create your account' : t==='reset' ? 'Reset your password' : 'Sign in to your practice';
+  }
+  if(lede && t!=='reset'){
+    lede.textContent = t==='signup' ? 'Set up your practice and start your trial.' : 'Your patient records are private to your account.';
+    lede.style.display='block';
+  } else if(lede && t==='reset'){
+    lede.style.display='none';
+  }
+}
+
+// Domain used to turn a plain username into an email for Supabase.
+var USERNAME_DOMAIN='speechpro.app';
+function resolveLogin(id){
+  id=(id||'').trim();
+  // If they typed a full email, use it as-is. Otherwise treat it as a username.
+  if(id.indexOf('@')!==-1) return id.toLowerCase();
+  return id.toLowerCase().replace(/\s+/g,'')+'@'+USERNAME_DOMAIN;
+}
+
+async function doLogin(){
+  var id=document.getElementById('l-email').value.trim();
+  var pass=document.getElementById('l-pass').value;
+  var err=document.getElementById('l-err');
+  err.style.display='none';
+  if(!id||!pass){err.textContent='Please enter your username and password.';err.style.display='block';return;}
+  var btn=event.target; btn.disabled=true; btn.textContent='Signing in…';
+  var {error}=await sb.auth.signInWithPassword({email:resolveLogin(id),password:pass});
+  btn.disabled=false; btn.textContent='Sign in';
+  if(error){err.textContent='Incorrect username or password.';err.style.display='block';}
+}
+
+async function doSignup(){
+  var name=document.getElementById('s-name').value.trim();
+  var clinic=document.getElementById('s-clinic').value.trim();
+  var email=document.getElementById('s-email').value.trim();
+  var pass=document.getElementById('s-pass').value;
+  var pass2=document.getElementById('s-pass2').value;
+  var err=document.getElementById('s-err');
+  var msg=document.getElementById('s-msg');
+  err.style.display='none'; msg.style.display='none';
+  if(!name||!email||!pass){err.textContent='Please fill in all required fields.';err.style.display='block';return;}
+  if(pass.length<8){err.textContent='Password must be at least 8 characters.';err.style.display='block';return;}
+  if(pass!==pass2){err.textContent='Passwords do not match.';err.style.display='block';return;}
+  var btn=event.target; btn.disabled=true; btn.textContent='Creating account…';
+  var {error}=await sb.auth.signUp({email,password:pass,options:{data:{full_name:name,clinic_name:clinic}}});
+  btn.disabled=false; btn.textContent='Start Free Trial';
+  if(error){err.textContent=error.message;err.style.display='block';}
+  else{
+    msg.innerHTML='✅ <strong>Account created!</strong><br>Please check your email to verify your account, then sign in.<br><br>'+
+      'Your <strong>30-day free trial</strong> has started.<br>'+
+      'Need help? Contact <strong>Jonathan Delaitre</strong> · +230 5 735 1067 · technic.itservices@gmail.com';
+    msg.style.display='block';
+  }
+}
+
+async function doReset(){
+  var email=document.getElementById('r-email').value.trim();
+  var err=document.getElementById('r-err');
+  var msg=document.getElementById('r-msg');
+  err.style.display='none'; msg.style.display='none';
+  if(!email){err.textContent='Please enter your email.';err.style.display='block';return;}
+  var {error}=await sb.auth.resetPasswordForEmail(email);
+  if(error){err.textContent=error.message;err.style.display='block';}
+  else{msg.textContent='✅ Password reset link sent! Check your email.';msg.style.display='block';}
+}
+
+async function doLogout(){
+  await sb.auth.signOut();
+}
+
+// ── PROFILE ───────────────────────────────────────
+async function loadProfile(){
+  var {data}=await sb.from('profiles').select('*').eq('id',curUser.id).single();
+  curProfile=data;
+  if(curProfile){
+    document.getElementById('t-name').textContent=curProfile.full_name||curUser.email;
+    document.getElementById('t-plan').textContent=curProfile.plan==='trial'?'Trial':curProfile.plan;
+    // Show admin console menu if this user is an admin
+    if(curProfile.is_admin){
+      document.getElementById('nav-admin-section').style.display='block';
+    } else {
+      document.getElementById('nav-admin-section').style.display='none';
+    }
+    // Record last login (fire and forget)
+    sb.from('profiles').update({last_login:new Date().toISOString()}).eq('id',curUser.id).then(function(){});
+  }
+}
+
+async function saveProfile(){
+  var {error}=await sb.from('profiles').update({
+    full_name:document.getElementById('pr-name').value.trim(),
+    clinic_name:document.getElementById('pr-clinic').value.trim(),
+    credentials:document.getElementById('pr-creds').value.trim(),
+    reg_number:document.getElementById('pr-reg').value.trim(),
+    phone:document.getElementById('pr-phone').value.trim(),
+    email:document.getElementById('pr-email').value.trim()
+  }).eq('id',curUser.id);
+  if(error){toast('❌ Error: '+error.message);}
+  else{await loadProfile();toast('✅ Profile saved!');}
+}
+
+function renderProfile(){
+  if(!curProfile)return;
+  document.getElementById('pr-name').value=curProfile.full_name||'';
+  document.getElementById('pr-clinic').value=curProfile.clinic_name||'';
+  document.getElementById('pr-creds').value=curProfile.credentials||'';
+  document.getElementById('pr-reg').value=curProfile.reg_number||'';
+  document.getElementById('pr-phone').value=curProfile.phone||'';
+  document.getElementById('pr-email').value=curProfile.email||curUser.email||'';
+  var plan=curProfile.plan||'trial';
+  var trialEnd=curProfile.trial_ends?new Date(curProfile.trial_ends).toLocaleDateString('en-GB'):'—';
+  var daysLeft=curProfile.trial_ends?Math.max(0,Math.ceil((new Date(curProfile.trial_ends)-new Date())/86400000)):0;
+  document.getElementById('sub-info').innerHTML=
+    '<div style="font-size:13px;color:var(--ink-soft);line-height:1.9">'+
+      '<p><strong>Current plan:</strong> <span class="badge badge-teal">'+plan.toUpperCase()+'</span></p>'+
+      (plan==='trial'?'<p><strong>Trial ends:</strong> '+trialEnd+' <span style="color:var(--teal);font-weight:700">('+daysLeft+' days left)</span></p>':'')+
+    '</div>'+
+    '<div style="margin:16px 0;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+
+      '<div style="border:1.5px solid var(--border);border-radius:10px;padding:14px;text-align:center">'+
+        '<div style="font-size:12px;font-weight:700;color:var(--teal);text-transform:uppercase">Basic</div>'+
+        '<div style="font-size:20px;font-weight:900;margin:6px 0">Rs 2,500<span style="font-size:11px;color:var(--muted)">/mo</span></div>'+
+        '<div style="font-size:11px;color:var(--muted)">Single therapist<br>Up to 50 patients</div>'+
+      '</div>'+
+      '<div style="border:2px solid var(--teal);border-radius:10px;padding:14px;text-align:center;position:relative">'+
+        '<div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);background:var(--teal);color:white;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px">POPULAR</div>'+
+        '<div style="font-size:12px;font-weight:700;color:var(--teal);text-transform:uppercase">Pro</div>'+
+        '<div style="font-size:20px;font-weight:900;margin:6px 0">Rs 4,000<span style="font-size:11px;color:var(--muted)">/mo</span></div>'+
+        '<div style="font-size:11px;color:var(--muted)">Unlimited patients<br>Reports + Assessments</div>'+
+      '</div>'+
+      '<div style="border:1.5px solid var(--border);border-radius:10px;padding:14px;text-align:center">'+
+        '<div style="font-size:12px;font-weight:700;color:var(--teal);text-transform:uppercase">Clinic</div>'+
+        '<div style="font-size:20px;font-weight:900;margin:6px 0">Rs 7,500<span style="font-size:11px;color:var(--muted)">/mo</span></div>'+
+        '<div style="font-size:11px;color:var(--muted)">Multiple therapists<br>Priority support</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="background:var(--teal-light);border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.7">'+
+      '<div style="font-weight:700;color:var(--teal-dark);margin-bottom:4px">To upgrade or subscribe, contact:</div>'+
+      '<div><strong>Jonathan Delaitre</strong> — Administrator</div>'+
+      '<div>📞 +230 5 735 1067</div>'+
+      '<div>✉️ technic.itservices@gmail.com</div>'+
+    '</div>';
+}
+
+// ── NAV ───────────────────────────────────────────
+function nav(page){
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('on');});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('on');});
+  var view=document.getElementById('view-'+page);
+  if(view)view.classList.add('on');
+  document.querySelectorAll('.nav-item').forEach(function(n){
+    if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+page+"'")){n.classList.add('on');}
+  });
+  if(page==='dashboard')  renderDash();
+  if(page==='patients')   renderPatients();
+  if(page==='schedule')   renderSchedule();
+  if(page==='assessments')renderAssessments();
+  if(page==='profile')    renderProfile();
+  if(page==='admin')      renderAdmin();
+  if(page==='reports')    renderReports();
+}
+
+// ═══════════════════════════════════════════════
+//  ADMIN CONSOLE
+// ═══════════════════════════════════════════════
+var _adminUsers = [];
+
+async function renderAdmin(){
+  // Security: double-check this user is actually an admin
+  if(!curProfile || !curProfile.is_admin){
+    document.getElementById('admin-tbody').innerHTML='<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--red)">Access denied. Admin only.</td></tr>';
+    return;
+  }
+  var {data,error}=await sb.from('admin_user_stats').select('*').order('created_at',{ascending:false});
+  if(error){
+    document.getElementById('admin-tbody').innerHTML='<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--red)">Error loading: '+error.message+'</td></tr>';
+    return;
+  }
+  _adminUsers=data||[];
+  // Stats
+  var total=_adminUsers.length;
+  var trial=_adminUsers.filter(function(u){return u.account_status==='trial_active';}).length;
+  var paid=_adminUsers.filter(function(u){return u.account_status==='paid_active';}).length;
+  var mrr=_adminUsers.filter(function(u){return u.account_status==='paid_active';}).reduce(function(s,u){return s+(parseFloat(u.plan_price)||0);},0);
+  document.getElementById('as-total').textContent=total;
+  document.getElementById('as-trial').textContent=trial;
+  document.getElementById('as-paid').textContent=paid;
+  document.getElementById('as-mrr').textContent='Rs '+mrr.toLocaleString();
+  renderAdminTable();
+}
+
+function renderAdminTable(){
+  var q=(document.getElementById('admin-search').value||'').toLowerCase();
+  var filt=document.getElementById('admin-filter').value;
+  var rows=_adminUsers.filter(function(u){
+    var matchQ=!q||(u.full_name||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q);
+    var matchF=!filt||u.account_status===filt;
+    return matchQ&&matchF;
+  });
+  var tbody=document.getElementById('admin-tbody');
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted)">No users found.</td></tr>';return;}
+  tbody.innerHTML=rows.map(function(u){
+    var statusBadge=
+      u.account_status==='trial_active'?'<span class="badge badge-teal">Trial</span>':
+      u.account_status==='trial_expired'?'<span class="badge badge-amber">Trial Expired</span>':
+      u.account_status==='paid_active'?'<span class="badge badge-green">Paid</span>':
+      u.account_status==='suspended'?'<span class="badge badge-red">Suspended</span>':
+      '<span class="badge">'+u.account_status+'</span>';
+    var trialInfo='';
+    if(u.account_status==='trial_active'){
+      var days=Math.max(0,Math.ceil((new Date(u.trial_ends)-new Date())/86400000));
+      trialInfo='<div style="font-size:11px;color:var(--muted);margin-top:2px">'+days+' days left</div>';
+    }
+    return '<tr style="border-top:1px solid var(--border)">'+
+      '<td style="padding:12px 14px"><div style="font-weight:600">'+xe(u.full_name||'—')+'</div>'+
+        '<div style="font-size:11px;color:var(--muted)">'+xe(u.email||'')+'</div>'+
+        (u.clinic_name?'<div style="font-size:11px;color:var(--muted)">'+xe(u.clinic_name)+'</div>':'')+'</td>'+
+      '<td style="padding:12px 14px">'+statusBadge+trialInfo+'</td>'+
+      '<td style="padding:12px 14px"><div style="font-weight:600;text-transform:capitalize">'+xe(u.plan||'trial')+'</div>'+
+        (u.plan_price>0?'<div style="font-size:11px;color:var(--muted)">Rs '+u.plan_price+'/mo</div>':'')+'</td>'+
+      '<td style="padding:12px 14px"><div style="font-size:12px">'+u.patient_count+' patients</div>'+
+        '<div style="font-size:11px;color:var(--muted)">'+u.session_count+' sessions</div></td>'+
+      '<td style="padding:12px 14px;font-size:12px;color:var(--muted)">'+fmtDate(u.created_at?u.created_at.split('T')[0]:'')+'</td>'+
+      '<td style="padding:12px 14px"><button class="btn btn-s btn-sm" onclick="openAdminUser(\''+u.id+'\')">Manage</button></td>'+
+    '</tr>';
+  }).join('');
+}
+
+function openAdminUser(id){
+  var u=_adminUsers.find(function(x){return x.id===id;});
+  if(!u)return;
+  document.getElementById('au-title').textContent='Manage: '+(u.full_name||u.email);
+  var lastLogin=u.last_login?new Date(u.last_login).toLocaleString('en-GB'):'Never';
+  document.getElementById('au-body').innerHTML=
+    '<div style="background:var(--sand);border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;line-height:1.9">'+
+      '<div><strong>Email:</strong> '+xe(u.email||'')+'</div>'+
+      '<div><strong>Clinic:</strong> '+xe(u.clinic_name||'—')+'</div>'+
+      '<div><strong>Current plan:</strong> <span style="text-transform:capitalize">'+xe(u.plan||'trial')+'</span></div>'+
+      '<div><strong>Patients:</strong> '+u.patient_count+' · <strong>Sessions:</strong> '+u.session_count+'</div>'+
+      '<div><strong>Last login:</strong> '+lastLogin+'</div>'+
+    '</div>'+
+    '<div class="fi"><label>Change Plan</label>'+
+      '<select id="au-plan">'+
+        '<option value="trial"'+(u.plan==='trial'?' selected':'')+'>Trial</option>'+
+        '<option value="basic"'+(u.plan==='basic'?' selected':'')+'>Basic — Rs2,500/mo</option>'+
+        '<option value="pro"'+(u.plan==='pro'?' selected':'')+'>Pro — Rs4,000/mo</option>'+
+        '<option value="clinic"'+(u.plan==='clinic'?' selected':'')+'>Clinic — Rs7,500/mo</option>'+
+      '</select></div>'+
+    '<div class="fi"><label>Subscription length (months)</label>'+
+      '<input id="au-months" type="number" value="1" min="1" max="24"></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+
+      '<button class="btn btn-p btn-sm" onclick="adminSetPlan(\''+u.id+'\')">💾 Update Plan</button>'+
+      (u.suspended?
+        '<button class="btn btn-s btn-sm" onclick="adminSuspend(\''+u.id+'\',false)">✅ Reactivate</button>':
+        '<button class="btn btn-d btn-sm" onclick="adminSuspend(\''+u.id+'\',true)">⏸ Suspend</button>')+
+      '<button class="btn btn-s btn-sm" onclick="adminResetPassword(\''+xe(u.email)+'\')">🔑 Reset Password</button>'+
+    '</div>'+
+    '<div class="fi" style="margin-top:16px"><label>Admin Notes (private)</label>'+
+      '<textarea id="au-notes" rows="3" placeholder="Internal notes about this account…">'+xe(u.admin_notes||'')+'</textarea>'+
+      '<button class="btn btn-s btn-sm" style="margin-top:8px" onclick="adminSaveNotes(\''+u.id+'\')">Save Notes</button></div>';
+  openModal('m-admin-user');
+}
+
+async function adminSetPlan(id){
+  var plan=document.getElementById('au-plan').value;
+  var months=parseInt(document.getElementById('au-months').value)||1;
+  var prices={trial:0,basic:2500,pro:4000,clinic:7500};
+  var {error}=await sb.rpc('admin_set_plan',{target_user:id,new_plan:plan,new_price:prices[plan],months:months});
+  if(error){toast('❌ '+error.message);return;}
+  toast('✅ Plan updated to '+plan);
+  closeModal('m-admin-user');
+  renderAdmin();
+}
+
+async function adminSuspend(id,suspend){
+  if(suspend && !confirm('Suspend this account? They will not be able to use the app.'))return;
+  var {error}=await sb.rpc('admin_set_suspended',{target_user:id,is_suspended:suspend});
+  if(error){toast('❌ '+error.message);return;}
+  toast(suspend?'⏸ Account suspended':'✅ Account reactivated');
+  closeModal('m-admin-user');
+  renderAdmin();
+}
+
+async function adminResetPassword(email){
+  if(!confirm('Send a password reset email to '+email+'?'))return;
+  var {error}=await sb.auth.resetPasswordForEmail(email);
+  if(error){toast('❌ '+error.message);return;}
+  toast('✅ Password reset email sent to '+email);
+}
+
+async function adminSaveNotes(id){
+  var notes=document.getElementById('au-notes').value;
+  var {error}=await sb.rpc('admin_save_notes',{target_user:id,notes:notes});
+  if(error){toast('❌ '+error.message);return;}
+  toast('✅ Notes saved');
+}
+
+// ── HELPERS ───────────────────────────────────────
+function toast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.style.display='block';
+  setTimeout(function(){t.style.display='none';},2800);
+}
+function fmtDate(d){
+  if(!d)return '—';
+  return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+}
+function today(){return new Date().toISOString().split('T')[0];}
+function xe(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function fillLocations(){
+  ['ss-loc','ap-loc'].forEach(function(id){
+    var sel=document.getElementById(id); if(!sel)return;
+    sel.innerHTML='<option value="">Select location…</option>';
+    LOCATIONS.forEach(function(l){sel.innerHTML+='<option>'+l+'</option>';});
+  });
+}
+function fillPatientDrops(){
+  sb.from('patients').select('id,fname,lname').eq('therapist_id',curUser.id).eq('status','active').order('lname').then(function(r){
+    ['ss-pat','ap-pat'].forEach(function(id){
+      var sel=document.getElementById(id); if(!sel)return;
+      sel.innerHTML='<option value="">Select patient…</option>';
+      (r.data||[]).forEach(function(p){sel.innerHTML+='<option value="'+p.id+'">'+p.lname+', '+p.fname+'</option>';});
+    });
+  });
+}
+
+// ── DASHBOARD ─────────────────────────────────────
+async function renderDash(){
+  document.getElementById('dash-date').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var todayStr=today();
+  var monthStart=todayStr.substring(0,7)+'-01';
+  var [pts,sess,appts,goals]=await Promise.all([
+    sb.from('patients').select('id',{count:'exact'}).eq('therapist_id',curUser.id).eq('status','active'),
+    sb.from('sessions').select('id',{count:'exact'}).eq('therapist_id',curUser.id).gte('date',monthStart),
+    sb.from('appointments').select('id',{count:'exact'}).eq('therapist_id',curUser.id).eq('status','scheduled').gte('date',todayStr),
+    sb.from('goals').select('id',{count:'exact'}).eq('therapist_id',curUser.id).eq('status','active')
+  ]);
+  document.getElementById('s-patients').textContent=pts.count||0;
+  document.getElementById('s-sessions').textContent=sess.count||0;
+  document.getElementById('s-appts').textContent=appts.count||0;
+  document.getElementById('s-goals').textContent=goals.count||0;
+  // Today's appointments
+  var {data:todayAppts}=await sb.from('appointments').select('*,patients(fname,lname)').eq('therapist_id',curUser.id).eq('date',todayStr).order('time');
+  var todayEl=document.getElementById('dash-today');
+  if(!todayAppts||!todayAppts.length){todayEl.innerHTML='<div style="font-size:13px;color:var(--muted)">No appointments today.</div>';return;}
+  todayEl.innerHTML=todayAppts.map(function(a){
+    return'<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--teal);min-width:70px">'+(a.time||'All day')+'</div>'+
+      '<div><div style="font-size:13px;font-weight:600">'+xe(a.patients?a.patients.fname+' '+a.patients.lname:'Unknown')+'</div>'+
+      '<div style="font-size:11px;color:var(--muted)">'+xe(a.type||'')+(a.location?' · '+xe(a.location):'')+'</div></div>'+
+      '<div style="margin-left:auto"><span class="badge badge-teal">'+a.status+'</span></div></div>';
+  }).join('');
+  // Plan banner
+  if(curProfile&&curProfile.plan==='trial'){
+    var daysLeft=Math.max(0,Math.ceil((new Date(curProfile.trial_ends)-new Date())/86400000));
+    document.getElementById('plan-banner').innerHTML=
+      '<div class="plan-banner"><div><h3>Trial Period</h3><p>'+daysLeft+' days remaining in your free trial</p></div>'+
+      '<button class="btn btn-s" style="background:white;color:var(--teal)" onclick="nav(\'profile\')">Upgrade</button></div>';
+  }
+}
+
+// ── PATIENTS ──────────────────────────────────────
+async function renderPatients(){
+  var q=(document.getElementById('p-search').value||'').toLowerCase();
+  var cf=document.getElementById('p-cond').value;
+  var query=sb.from('patients').select('*').eq('therapist_id',curUser.id).order('lname');
+  if(curPTab==='discharged') query=query.eq('status','discharged');
+  else { query=query.eq('status','active').eq('patient_type',curPTab); }
+  if(cf) query=query.contains('conditions',[cf]);
+  var {data:pts,error}=await query;
+  if(error){toast('Error loading patients');return;}
+  var filtered=(pts||[]).filter(function(p){
+    return !q||(p.fname+' '+p.lname).toLowerCase().includes(q);
+  });
+  // Update tab counts
+  var [ac,pc,dc]=await Promise.all([
+    sb.from('patients').select('id',{count:'exact'}).eq('therapist_id',curUser.id).eq('status','active').eq('patient_type','adult'),
+    sb.from('patients').select('id',{count:'exact'}).eq('therapist_id',curUser.id).eq('status','active').eq('patient_type','pediatric'),
+    sb.from('patients').select('id',{count:'exact'}).eq('therapist_id',curUser.id).eq('status','discharged')
+  ]);
+  document.getElementById('ptab-adult').textContent='👤 Adult ('+(ac.count||0)+')';
+  document.getElementById('ptab-pediatric').textContent='🧒 Pediatric ('+(pc.count||0)+')';
+  document.getElementById('ptab-discharged').textContent='✅ Discharged ('+(dc.count||0)+')';
+  document.getElementById('p-sub').textContent=filtered.length+' patients';
+  var grid=document.getElementById('pgrid');
+  if(!filtered.length){grid.innerHTML='<div class="es" style="grid-column:1/-1"><div class="ei">👥</div><h3>No patients found</h3><p>Add your first patient above.</p></div>';return;}
+  grid.innerHTML=filtered.map(function(p){
+    var tags=(p.conditions||[]).map(function(c){return'<span class="ptag">'+xe(COND_LABELS[c]||c)+'</span>';}).join('');
+    var isDis=p.status==='discharged';
+    return'<div class="pc" onclick="openDetail(\''+p.id+'\')">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+      '<div class="pname">'+xe(p.fname)+' '+xe(p.lname)+'</div>'+
+      (isDis?'<span class="badge" style="background:var(--sand-dark);color:var(--muted)">Discharged</span>':'<span class="badge badge-green">Active</span>')+
+      '</div>'+
+      '<div class="pmeta">'+(p.dob?calcAge(p.dob)+' yrs · ':'')+xe(p.gender||'')+'</div>'+
+      '<div class="ptags">'+tags+'</div>'+
+      '<div class="pfoot">'+
+        '<span>Since '+fmtDate(p.created_at)+'</span>'+
+        '<div style="display:flex;gap:6px">'+
+        '<button class="btn btn-s btn-sm" onclick="event.stopPropagation();editPatient(\''+p.id+'\')">✏️</button>'+
+        '<button class="btn btn-d btn-sm" onclick="event.stopPropagation();deletePatient(\''+p.id+'\',\''+xe(p.fname+' '+p.lname)+'\')">🗑</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function switchPTab(t){
+  curPTab=t;
+  ['adult','pediatric','discharged'].forEach(function(x){
+    document.getElementById('ptab-'+x).classList.toggle('on',x===t);
+  });
+  renderPatients();
+}
+
+function calcAge(dob){
+  if(!dob)return'?';
+  var d=new Date(dob),n=new Date();
+  var a=n.getFullYear()-d.getFullYear();
+  if(n.getMonth()<d.getMonth()||(n.getMonth()===d.getMonth()&&n.getDate()<d.getDate()))a--;
+  return a;
+}
+
+var _editPatId=null;
+function openAddPatient(){
+  _editPatId=null;
+  document.getElementById('m-patient-title').textContent='Add Patient';
+  ['pf','pl','pd','pp','pe','pr-ref','pnotes'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['c1','c2','c3','c4','c5','c6'].forEach(function(id){document.getElementById(id).checked=false;});
+  document.getElementById('ptype').value='adult';
+  document.getElementById('pstatus').value='active';
+  openModal('m-patient');
+}
+
+async function editPatient(id){
+  var {data:p}=await sb.from('patients').select('*').eq('id',id).single();
+  if(!p)return;
+  _editPatId=id;
+  document.getElementById('m-patient-title').textContent='Edit Patient';
+  document.getElementById('pf').value=p.fname||'';
+  document.getElementById('pl').value=p.lname||'';
+  document.getElementById('pd').value=p.dob||'';
+  document.getElementById('pg').value=p.gender||'Select…';
+  document.getElementById('ptype').value=p.patient_type||'adult';
+  document.getElementById('pstatus').value=p.status||'active';
+  document.getElementById('pp').value=p.phone||'';
+  document.getElementById('pe').value=p.email||'';
+  document.getElementById('pr-ref').value=p.referral||'';
+  document.getElementById('pnotes').value=p.notes||'';
+  ['c1','c2','c3','c4','c5','c6'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)el.checked=(p.conditions||[]).includes(el.value);
+  });
+  openModal('m-patient');
+}
+
+async function savePatient(){
+  var f=document.getElementById('pf').value.trim();
+  var l=document.getElementById('pl').value.trim();
+  if(!f||!l){toast('⚠️ Name required.');return;}
+  var conds=['c1','c2','c3','c4','c5','c6'].filter(function(id){return document.getElementById(id).checked;}).map(function(id){return document.getElementById(id).value;});
+  var data={
+    therapist_id:curUser.id,fname:f,lname:l,
+    dob:document.getElementById('pd').value||null,
+    gender:document.getElementById('pg').value,
+    patient_type:document.getElementById('ptype').value,
+    status:document.getElementById('pstatus').value,
+    phone:document.getElementById('pp').value.trim(),
+    email:document.getElementById('pe').value.trim(),
+    referral:document.getElementById('pr-ref').value.trim(),
+    conditions:conds,
+    notes:document.getElementById('pnotes').value.trim()
+  };
+  var error;
+  if(_editPatId){
+    var r=await sb.from('patients').update(data).eq('id',_editPatId);
+    error=r.error;
+  } else {
+    var r=await sb.from('patients').insert(data);
+    error=r.error;
+  }
+  if(error){toast('❌ '+error.message);return;}
+  closeModal('m-patient');
+  toast(_editPatId?'✅ Patient updated!':'✅ Patient added!');
+  renderPatients();
+  fillPatientDrops();
+}
+
+async function deletePatient(id,name){
+  if(!confirm('Delete '+name+'? This will also delete all their sessions, goals and appointments. This cannot be undone.'))return;
+  await sb.rpc('delete_patient_data',{patient_uuid:id});
+  toast('🗑 Patient deleted.');
+  renderPatients();
+}
+
+// ── PATIENT DETAIL ────────────────────────────────
+async function openDetail(id){
+  var {data:p}=await sb.from('patients').select('*').eq('id',id).single();
+  if(!p)return;
+  curPatient=p;
+  curDTab='overview';
+  var header=document.getElementById('detail-header');
+  header.innerHTML=
+    '<div class="vh">'+
+      '<div><h1>'+xe(p.fname)+' '+xe(p.lname)+'</h1>'+
+      '<div class="sub">'+(p.dob?calcAge(p.dob)+' yrs · ':'')+xe(p.gender||'')+(p.phone?' · '+xe(p.phone):'')+'</div></div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-p btn-sm" onclick="document.getElementById(\'ss-pat\').value=\''+p.id+'\';openModal(\'m-session\')">＋ Session</button>'+
+        '<button class="btn btn-s btn-sm" onclick="document.getElementById(\'ap-pat\').value=\''+p.id+'\';openModal(\'m-appt\')">＋ Appointment</button>'+
+        '<button class="btn btn-s btn-sm" onclick="editPatient(\''+p.id+'\')">✏️ Edit</button>'+
+        '<button class="btn btn-s btn-sm" onclick="nav(\'patients\')">← Back</button>'+
+      '</div>'+
+    '</div>';
+  nav('detail');
+  renderDTab('overview');
+}
+
+async function switchDTab(t){
+  curDTab=t;
+  document.querySelectorAll('.dtab').forEach(function(el,i){
+    el.classList.toggle('on',['overview','sessions','goals','appointments','assessments'][i]===t);
+  });
+  renderDTab(t);
+}
+
+async function renderDTab(t){
+  var body=document.getElementById('detail-body');
+  var p=curPatient;
+  if(t==='overview'){
+    body.innerHTML=
+      '<div class="card"><div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:12px">Patient Information</div>'+
+      '<div class="fg" style="gap:16px">'+
+        '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Date of Birth</div><div style="font-size:13px;font-weight:600">'+fmtDate(p.dob)+'</div></div>'+
+        '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Type</div><div style="font-size:13px;font-weight:600">'+xe(p.patient_type||'Adult')+'</div></div>'+
+        '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Referral</div><div style="font-size:13px;font-weight:600">'+xe(p.referral||'—')+'</div></div>'+
+        '<div><div style="font-size:11px;color:var(--muted);margin-bottom:2px">Status</div><div style="font-size:13px;font-weight:600">'+xe(p.status||'active')+'</div></div>'+
+      '</div>'+
+      '<div style="margin-top:14px"><div style="font-size:11px;color:var(--muted);margin-bottom:6px">Conditions</div>'+
+      (p.conditions||[]).map(function(c){return'<span class="ptag" style="margin-right:6px">'+xe(COND_LABELS[c]||c)+'</span>';}).join('')+'</div>'+
+      (p.notes?'<div style="margin-top:14px"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Notes</div><div style="font-size:13px;color:var(--ink-soft);line-height:1.6">'+xe(p.notes)+'</div></div>':'')+
+      '</div>';
+    return;
+  }
+  if(t==='sessions'){
+    var {data:sess}=await sb.from('sessions').select('*').eq('patient_id',p.id).order('date',{ascending:false});
+    body.innerHTML='<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-p btn-sm" onclick="document.getElementById(\'ss-pat\').value=\''+p.id+'\';openModal(\'m-session\')">＋ Log Session</button></div>'+
+      '<div class="slist">'+
+      (sess&&sess.length?sess.map(function(s){
+        return'<div class="si">'+
+          '<div class="sdate">'+fmtDate(s.date)+'</div>'+
+          '<div class="sinfo"><div class="stitle">'+xe(s.title||'Session')+'</div>'+
+          '<div class="smeta">'+
+            '<span>⏱ '+s.duration+' min</span>'+
+            (s.location?'<span>📍 '+xe(s.location)+'</span>':'')+
+            (s.score!=null?'<span>'+s.score+'%</span>':'')+
+            (s.progress?'<span>'+xe(s.progress)+'</span>':'')+
+          '</div></div>'+
+          '<button class="btn btn-d btn-sm" onclick="deleteSession(\''+s.id+'\')">🗑</button>'+
+        '</div>';
+      }).join(''):'<div class="es"><div class="ei">📝</div><h3>No sessions yet</h3></div>')+
+      '</div>';
+    return;
+  }
+  if(t==='goals'){
+    var {data:goals}=await sb.from('goals').select('*').eq('patient_id',p.id).order('created_at',{ascending:false});
+    body.innerHTML='<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-p btn-sm" onclick="openModal(\'m-goal\')">＋ Add Goal</button></div>'+
+      (goals&&goals.length?goals.map(function(g){
+        var pct=g.progress||0;
+        var cls=g.status==='achieved'?'badge-green':g.status==='paused'?'badge-amber':'badge-teal';
+        return'<div class="card" style="margin-bottom:10px">'+
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
+            '<div style="flex:1;font-size:13px;font-weight:600">'+xe(g.text)+'</div>'+
+            '<span class="badge '+cls+'">'+g.status+'</span>'+
+          '</div>'+
+          '<div style="background:var(--sand-dark);border-radius:4px;height:6px;margin-bottom:6px">'+
+            '<div style="background:var(--teal);height:6px;border-radius:4px;width:'+pct+'%"></div></div>'+
+          '<div style="font-size:11px;color:var(--muted)">'+pct+'% · Target: '+fmtDate(g.target_date)+'</div>'+
+          '<div style="margin-top:10px;display:flex;gap:6px">'+
+            '<button class="btn btn-s btn-sm" onclick="updateGoal(\''+g.id+'\')">Update</button>'+
+            '<button class="btn btn-d btn-sm" onclick="deleteGoal(\''+g.id+'\')">🗑</button>'+
+          '</div></div>';
+      }).join(''):'<div class="es"><div class="ei">🎯</div><h3>No goals yet</h3></div>');
+    return;
+  }
+  if(t==='appointments'){
+    var {data:appts}=await sb.from('appointments').select('*').eq('patient_id',p.id).order('date',{ascending:false});
+    body.innerHTML='<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-p btn-sm" onclick="document.getElementById(\'ap-pat\').value=\''+p.id+'\';openModal(\'m-appt\')">＋ Add Appointment</button></div>'+
+      '<div class="appt-list">'+
+      (appts&&appts.length?appts.map(function(a){
+        var sc=a.status==='completed'?'badge-green':a.status==='cancelled'?'badge-red':a.status==='no-show'?'badge-amber':'badge-teal';
+        return'<div class="ai"><div class="adate">'+fmtDate(a.date)+(a.time?'<br><small>'+a.time+'</small>':'')+'</div>'+
+          '<div class="ainfo"><div class="aname">'+xe(a.type||'Appointment')+'</div>'+
+          '<div class="atype">'+(a.location?'📍 '+xe(a.location):'')+(a.notes?' · '+xe(a.notes):'')+'</div></div>'+
+          '<span class="badge '+sc+'">'+a.status+'</span></div>';
+      }).join(''):'<div class="es"><div class="ei">📅</div><h3>No appointments yet</h3></div>')+
+      '</div>';
+  }
+  if(t==='assessments'){
+    var {data:assess}=await sb.from('assessments').select('*').eq('patient_id',p.id).order('date',{ascending:false});
+    var toolBtns=ASSESS_TOOLS.map(function(tl){
+      return '<button class="btn btn-s btn-sm" onclick="curPatient={id:\''+p.id+'\',fname:\''+xe(p.fname)+'\',lname:\''+xe(p.lname)+'\'};nav(\'assessments\');startAssess(\''+tl.id+'\')">'+tl.icon+' '+xe(tl.name.split('—')[0].trim())+'</button>';
+    }).join(' ');
+    body.innerHTML=
+      '<div style="margin-bottom:16px"><div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Run New Assessment</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+toolBtns+'</div></div>'+
+      '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Past Assessments</div>'+
+      '<div class="slist">'+
+      (assess&&assess.length?assess.map(function(a){
+        var tool=ASSESS_TOOLS.find(function(x){return x.id===a.tool_id;});
+        return '<div class="si"><div class="sdate">'+fmtDate(a.date)+'</div>'+
+          '<div class="sinfo"><div class="stitle">'+(tool?tool.icon+' '+xe(tool.name):xe(a.tool_id))+'</div>'+
+          '<div class="smeta"><span>Score: '+a.total+'</span><span>'+xe(a.severity||'')+'</span></div></div>'+
+          '<button class="btn btn-s btn-sm" onclick="viewAssessResult(\''+a.id+'\')">View</button>'+
+          '<button class="btn btn-d btn-sm" onclick="delAssessFromPatient(\''+a.id+'\')">🗑</button></div>';
+      }).join(''):'<div class="es"><div class="ei">🩺</div><h3>No assessments yet</h3><p>Run one using the tools above.</p></div>')+
+      '</div>';
+  }
+}
+
+async function delAssessFromPatient(rid){
+  if(!confirm('Delete this assessment?'))return;
+  await sb.from('assessments').delete().eq('id',rid);
+  toast('🗑 Assessment deleted.');
+  renderDTab('assessments');
+}
+
+// ── SESSIONS ──────────────────────────────────────
+async function saveSession(){
+  var pid=document.getElementById('ss-pat').value;
+  var date=document.getElementById('ss-date').value;
+  if(!pid||!date){toast('⚠️ Patient and date required.');return;}
+  var {error}=await sb.from('sessions').insert({
+    therapist_id:curUser.id,patient_id:pid,date:date,
+    title:document.getElementById('ss-title').value.trim()||'Therapy Session',
+    duration:parseInt(document.getElementById('ss-dur').value)||45,
+    score:document.getElementById('ss-score').value!==''?parseInt(document.getElementById('ss-score').value):null,
+    progress:document.getElementById('ss-prog').value,
+    location:document.getElementById('ss-loc').value,
+    notes:document.getElementById('ss-notes').value.trim(),
+    homework:document.getElementById('ss-hw').value.trim()
+  });
+  if(error){toast('❌ '+error.message);return;}
+  closeModal('m-session');
+  toast('✅ Session saved!');
+  if(curPatient) renderDTab('sessions');
+}
+
+async function deleteSession(id){
+  if(!confirm('Delete this session?'))return;
+  await sb.from('sessions').delete().eq('id',id);
+  toast('🗑 Session deleted.');
+  renderDTab('sessions');
+}
+
+// ── GOALS ─────────────────────────────────────────
+async function saveGoal(){
+  var text=document.getElementById('g-text').value.trim();
+  if(!text||!curPatient){toast('⚠️ Goal text required.');return;}
+  var {error}=await sb.from('goals').insert({
+    therapist_id:curUser.id,patient_id:curPatient.id,
+    text:text,priority:document.getElementById('g-pri').value,
+    target_date:document.getElementById('g-date').value||null
+  });
+  if(error){toast('❌ '+error.message);return;}
+  closeModal('m-goal');
+  toast('✅ Goal added!');
+  renderDTab('goals');
+}
+
+async function updateGoal(id){
+  var prog=prompt('New progress (0-100):');
+  if(prog===null)return;
+  var n=Math.max(0,Math.min(100,parseInt(prog)||0));
+  await sb.from('goals').update({progress:n,status:n===100?'achieved':'active'}).eq('id',id);
+  toast('✅ Goal updated!');
+  renderDTab('goals');
+}
+
+async function deleteGoal(id){
+  if(!confirm('Delete this goal?'))return;
+  await sb.from('goals').delete().eq('id',id);
+  toast('🗑 Goal deleted.');
+  renderDTab('goals');
+}
+
+// ── SCHEDULE (list / week / month) ─────────────────
+var schedView='list';
+var calDate=new Date();
+var _apptCache=[];
+
+function openAddAppt(){
+  fillPatientDrops();
+  document.getElementById('ap-date').value=today();
+  document.getElementById('ap-time').value='';
+  document.getElementById('ap-status').value='scheduled';
+  openModal('m-appt');
+}
+
+function switchSchedView(v){
+  schedView=v;
+  ['list','week','month'].forEach(function(t){
+    var btn=document.getElementById('sv-'+t);
+    if(btn){btn.style.background=t===v?'var(--teal)':'white';btn.style.color=t===v?'white':'var(--muted)';}
+  });
+  document.getElementById('sched-list-toolbar').style.display=v==='list'?'flex':'none';
+  document.getElementById('sched-cal-toolbar').style.display=v!=='list'?'flex':'none';
+  renderSchedule();
+}
+
+function calNav(dir){
+  if(schedView==='month') calDate=new Date(calDate.getFullYear(),calDate.getMonth()+dir,1);
+  else calDate=new Date(calDate.getTime()+dir*7*24*60*60*1000);
+  renderSchedule();
+}
+function calGoToday(){ calDate=new Date(); renderSchedule(); }
+function evtCls(s){ return s==='completed'?'e-co':s==='cancelled'?'e-ca':s==='no-show'?'e-ns':'e-sc'; }
+
+async function renderSchedule(){
+  // Load all appointments for this therapist into cache
+  var {data:appts}=await sb.from('appointments').select('*,patients(fname,lname)').eq('therapist_id',curUser.id).order('date',{ascending:false});
+  _apptCache=appts||[];
+  fillPatientDrops();
+  if(schedView==='list') renderSchedList();
+  else if(schedView==='week') renderSchedWeek();
+  else renderSchedMonth();
+}
+
+function apptPName(a){ return a.patients?a.patients.fname+' '+a.patients.lname:'Unknown'; }
+
+function renderSchedList(){
+  var q=(document.getElementById('a-search').value||'').toLowerCase();
+  var sf=document.getElementById('a-filt').value;
+  var as=_apptCache.slice();
+  if(sf)as=as.filter(function(a){return a.status===sf;});
+  if(q)as=as.filter(function(a){return apptPName(a).toLowerCase().includes(q)||(a.type||'').toLowerCase().includes(q);});
+  document.getElementById('sched-list').innerHTML=as.length?as.map(function(a){
+    var sc=a.status==='no-show'?'ns':a.status==='completed'?'co':a.status==='cancelled'?'ca':'sc';
+    return'<div class="ai">'+
+      '<div class="at">'+fmtDate(a.date)+'<br><span style="font-size:11px;color:var(--muted)">'+(a.time||'')+'</span></div>'+
+      '<div class="ainfo">'+
+        '<div class="ap" style="cursor:pointer;color:var(--teal)" onclick="openDetail(\''+a.patient_id+'\')">'+xe(apptPName(a))+'</div>'+
+        '<div class="aty">'+xe(a.type||'')+'</div>'+
+        (a.location?'<div style="font-size:11px;color:var(--muted)">📍 '+xe(a.location)+'</div>':'')+
+        (a.notes?'<div style="font-size:11px;color:var(--muted)">'+xe(a.notes)+'</div>':'')+
+      '</div>'+
+      '<span class="sb2 s-'+sc+'">'+a.status+'</span>'+
+      '<button class="btn btn-s btn-sm" onclick="viewAppt(\''+a.id+'\')">View</button>'+
+    '</div>';
+  }).join(''):'<div class="es"><div class="ei">📅</div><h3>No appointments</h3><p>Add your first appointment above.</p></div>';
+}
+
+function renderSchedMonth(){
+  var y=calDate.getFullYear(), m=calDate.getMonth();
+  var title=['January','February','March','April','May','June','July','August','September','October','November','December'][m]+' '+y;
+  document.getElementById('cal-title').textContent=title;
+  var startDay=new Date(y,m,1).getDay();
+  var daysInMonth=new Date(y,m+1,0).getDate();
+  var daysInPrev=new Date(y,m,0).getDate();
+  var todayStr=today();
+  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var headers=days.map(function(d){return'<div class="cal-hdr">'+d+'</div>';}).join('');
+  var cells='';
+  for(var i=0;i<startDay;i++){cells+='<div class="cal-day other-month"><div class="cal-dn">'+(daysInPrev-startDay+1+i)+'</div></div>';}
+  for(var d2=1;d2<=daysInMonth;d2++){
+    var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d2).padStart(2,'0');
+    var isToday=ds===todayStr;
+    var dayAppts=_apptCache.filter(function(a){return a.date===ds;});
+    var evts=dayAppts.slice(0,3).map(function(a){
+      return'<div class="cal-evt '+evtCls(a.status)+'" onclick="event.stopPropagation();viewAppt(\''+a.id+'\')" style="cursor:pointer" title="'+xe(apptPName(a))+'">'+(a.time?a.time+' ':'')+xe(apptPName(a))+'</div>';
+    }).join('');
+    var more=dayAppts.length>3?'<div style="font-size:9px;color:var(--muted)">+'+(dayAppts.length-3)+' more</div>':'';
+    cells+='<div class="cal-day'+(isToday?' today':'')+'" onclick="newApptOnDate(\''+ds+'\')" title="Click to add appointment"><div class="cal-dn">'+d2+'</div>'+evts+more+'</div>';
+  }
+  var total=startDay+daysInMonth;
+  var rem=total%7===0?0:7-(total%7);
+  for(var i2=1;i2<=rem;i2++) cells+='<div class="cal-day other-month"><div class="cal-dn">'+i2+'</div></div>';
+  document.getElementById('sched-list').innerHTML='<div class="cal-grid">'+headers+cells+'</div>';
+}
+
+function renderSchedWeek(){
+  var d=new Date(calDate);
+  var day=d.getDay();
+  var diffToMon=day===0?-6:1-day;
+  d.setDate(d.getDate()+diffToMon);
+  var weekDays=[];
+  for(var i=0;i<7;i++){weekDays.push(new Date(d));d.setDate(d.getDate()+1);}
+  var dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var todayStr=today();
+  function toDs(wd){return wd.getFullYear()+'-'+String(wd.getMonth()+1).padStart(2,'0')+'-'+String(wd.getDate()).padStart(2,'0');}
+  document.getElementById('cal-title').textContent=weekDays[0].toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+weekDays[6].toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  var hdrs='<div class="week-hdr" style="background:var(--teal-dark);border:none"></div>';
+  weekDays.forEach(function(wd,i){
+    var isT=toDs(wd)===todayStr;
+    hdrs+='<div class="week-hdr'+(isT?' today-col':'')+'">'+dayNames[i]+'<br><span style="font-size:14px;font-weight:900">'+wd.getDate()+'</span></div>';
+  });
+  var rows='';
+  for(var h=7;h<=20;h++){
+    var hLabel=h<12?h+' AM':h===12?'12 PM':(h-12)+' PM';
+    rows+='<div class="week-time">'+hLabel+'</div>';
+    weekDays.forEach(function(wd){
+      var ds=toDs(wd);
+      var isT=ds===todayStr;
+      var hourAppts=_apptCache.filter(function(a){
+        if(a.date!==ds||!a.time)return false;
+        return parseInt(a.time.split(':')[0])===h;
+      });
+      var evts=hourAppts.map(function(a){
+        return'<div class="cal-evt '+evtCls(a.status)+'" onclick="event.stopPropagation();viewAppt(\''+a.id+'\')" style="font-size:9px;cursor:pointer" title="'+xe(apptPName(a))+'">'+xe(apptPName(a))+'</div>';
+      }).join('');
+      var hStr=String(h).padStart(2,'0')+':00';
+      rows+='<div class="week-cell'+(isT?' today-col':'')+'" onclick="newApptOnDate(\''+ds+'\',\''+hStr+'\')" style="cursor:pointer" title="Add appointment">'+evts+'</div>';
+    });
+  }
+  var allDayRow='<div class="week-time" style="font-size:9px">All day</div>';
+  weekDays.forEach(function(wd){
+    var ds=toDs(wd);
+    var isT=ds===todayStr;
+    var noTimeAppts=_apptCache.filter(function(a){return a.date===ds&&!a.time;});
+    var evts=noTimeAppts.map(function(a){
+      return'<div class="cal-evt '+evtCls(a.status)+'" onclick="event.stopPropagation();viewAppt(\''+a.id+'\')" style="font-size:9px;cursor:pointer">'+xe(apptPName(a))+'</div>';
+    }).join('');
+    allDayRow+='<div class="week-cell'+(isT?' today-col':'')+'" onclick="newApptOnDate(\''+ds+'\')" style="background:var(--sand);cursor:pointer">'+evts+'</div>';
+  });
+  document.getElementById('sched-list').innerHTML='<div class="week-grid">'+hdrs+allDayRow+rows+'</div>';
+}
+
+// Clicking a calendar day/slot opens the modal PRE-FILLED with THAT date
+function newApptOnDate(dateStr, timeStr){
+  fillPatientDrops();
+  document.getElementById('ap-date').value=dateStr;
+  document.getElementById('ap-time').value=timeStr||'';
+  document.getElementById('ap-status').value='scheduled';
+  openModal('m-appt');
+}
+
+async function viewAppt(aid){
+  var a=_apptCache.find(function(x){return x.id===aid;});
+  if(!a)return;
+  var sc=a.status==='completed'?'var(--green)':a.status==='cancelled'?'var(--red)':a.status==='no-show'?'var(--amber)':'var(--teal)';
+  document.getElementById('m-appt-view-body').innerHTML=
+    '<div style="display:flex;flex-direction:column;gap:12px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center">'+
+      '<span style="font-size:18px;font-weight:700;color:var(--ink)">'+xe(apptPName(a))+'</span>'+
+      '<span style="padding:4px 12px;border-radius:12px;font-size:12px;font-weight:700;background:'+sc+';color:white">'+a.status+'</span>'+
+    '</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:13px">'+
+      '<tr><td style="padding:7px 0;color:var(--muted);width:40%">📅 Date</td><td style="font-weight:600">'+fmtDate(a.date)+'</td></tr>'+
+      (a.time?'<tr><td style="padding:7px 0;color:var(--muted)">⏰ Time</td><td style="font-weight:600">'+a.time+'</td></tr>':'')+
+      '<tr><td style="padding:7px 0;color:var(--muted)">📋 Type</td><td>'+xe(a.type||'')+'</td></tr>'+
+      (a.location?'<tr><td style="padding:7px 0;color:var(--muted)">📍 Location</td><td>'+xe(a.location)+'</td></tr>':'')+
+      (a.notes?'<tr><td style="padding:7px 0;color:var(--muted);vertical-align:top">📝 Notes</td><td>'+xe(a.notes)+'</td></tr>':'')+
+    '</table>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--border)">'+
+      '<button class="btn btn-s btn-sm" onclick="cycleApptView(\''+aid+'\')">🔄 Change Status</button>'+
+      '<button class="btn btn-d btn-sm" onclick="deleteApptView(\''+aid+'\')">🗑 Delete</button>'+
+    '</div>'+
+    '</div>';
+  openModal('m-appt-view');
+}
+
+async function cycleApptView(aid){
+  var a=_apptCache.find(function(x){return x.id===aid;});
+  if(!a)return;
+  var sts=['scheduled','completed','cancelled','no-show'];
+  var next=sts[(sts.indexOf(a.status)+1)%sts.length];
+  await sb.from('appointments').update({status:next}).eq('id',aid);
+  toast('✅ Status: '+next);
+  closeModal('m-appt-view');
+  renderSchedule();
+}
+
+async function deleteApptView(aid){
+  if(!confirm('Delete this appointment?'))return;
+  await sb.from('appointments').delete().eq('id',aid);
+  toast('🗑 Appointment deleted.');
+  closeModal('m-appt-view');
+  renderSchedule();
+}
+
+async function saveAppt(){
+  var pid=document.getElementById('ap-pat').value;
+  var date=document.getElementById('ap-date').value;
+  if(!pid||!date){toast('⚠️ Patient and date required.');return;}
+  var {error}=await sb.from('appointments').insert({
+    therapist_id:curUser.id,patient_id:pid,date:date,
+    time:document.getElementById('ap-time').value,
+    type:document.getElementById('ap-type').value,
+    status:document.getElementById('ap-status').value,
+    location:document.getElementById('ap-loc').value,
+    notes:document.getElementById('ap-notes').value.trim()
+  });
+  if(error){toast('❌ '+error.message);return;}
+  closeModal('m-appt');
+  toast('✅ Appointment saved!');
+  renderSchedule();
+}
+
+async function cycleAppt(id,status){
+  var sts=['scheduled','completed','cancelled','no-show'];
+  var next=sts[(sts.indexOf(status)+1)%sts.length];
+  await sb.from('appointments').update({status:next}).eq('id',id);
+  toast('✅ Status: '+next);
+  renderSchedule();
+}
+
+// ═══════════════════════════════════════════════
+//  ASSESSMENTS (full module)
+// ═══════════════════════════════════════════════
+const ASSESS_TOOLS=[
+  {id:'sssi',icon:'🗣️',name:'Stuttering Severity — SSI-4 Screener',desc:'Clinician-rated screener based on SSI-4 dimensions.',category:'stuttering',duration:'10–15 min',ageRange:'3+',
+    sections:[
+      {title:'Frequency',questions:[{id:'ss1',label:'Stuttering on reading/monologue (%SS)',type:'likert',options:['0% (0)','1–2% (2)','3–5% (4)','6–9% (6)','10–16% (8)','17–26% (10)','27%+ (12)'],values:[0,2,4,6,8,10,12]},{id:'ss2',label:'Stuttering in conversation vs reading',type:'likert',options:['Much less','Somewhat less','About same','Somewhat more','Much more'],values:[0,1,2,3,4]}]},
+      {title:'Duration',questions:[{id:'ss3',label:'Average duration of longest stutter',type:'likert',options:['<0.5s (2)','0.5–0.9s (4)','1–1.9s (6)','2–4.9s (8)','5–9.9s (10)','10–29.9s (12)','30s+ (14)'],values:[2,4,6,8,10,12,14]}]},
+      {title:'Physical Concomitants',questions:[{id:'ss4',label:'Distracting sounds',type:'likert',options:['None (0)','Not noticeable (1)','Barely noticeable (2)','Distracting (3)','Very distracting (4)','Severe (5)'],values:[0,1,2,3,4,5]},{id:'ss5',label:'Facial grimaces',type:'likert',options:['None (0)','Not noticeable (1)','Barely noticeable (2)','Distracting (3)','Very distracting (4)','Severe (5)'],values:[0,1,2,3,4,5]},{id:'ss6',label:'Head movements',type:'likert',options:['None (0)','Not noticeable (1)','Barely noticeable (2)','Distracting (3)','Very distracting (4)','Severe (5)'],values:[0,1,2,3,4,5]},{id:'ss7',label:'Extremity movements',type:'likert',options:['None (0)','Not noticeable (1)','Barely noticeable (2)','Distracting (3)','Very distracting (4)','Severe (5)'],values:[0,1,2,3,4,5]}]},
+      {title:'Impact',questions:[{id:'ss8',label:'Avoidance of speaking situations',type:'likert',options:['Never','Rarely','Sometimes','Often','Always'],values:[0,1,2,3,4]},{id:'ss9',label:'Clinician overall impression',type:'likert',options:['No concern','Mild','Moderate','Significant','Severe'],values:[0,1,2,3,4]}]}
+    ],
+    scoreInterp:(t)=>{if(t<=10)return{label:'Very Mild',cls:'sv-mild',interp:'Stuttering infrequent with minimal impact. Monitor and reassess in 6 months.'};if(t<=20)return{label:'Mild',cls:'sv-mild',interp:'Noticeable but manageable. Consider indirect therapy and parent guidance.'};if(t<=30)return{label:'Moderate',cls:'sv-mod',interp:'Impacts communication. Direct therapy recommended.'};if(t<=40)return{label:'Severe',cls:'sv-sev',interp:'Significantly impairs communication. Intensive therapy indicated.'};return{label:'Very Severe',cls:'sv-sev',interp:'Severe impact. Urgent therapy. Multidisciplinary referral may be appropriate.'};}
+  },
+  {id:'pcc',icon:'👄',name:'Articulation Screener — PCC Estimate',desc:'Clinician-rated PCC estimate across word positions.',category:'articulation',duration:'10–20 min',ageRange:'2–12',
+    sections:[
+      {title:'Consonant Accuracy',questions:[{id:'pc1',label:'Initial consonant accuracy',type:'likert',options:['90–100%','75–89%','60–74%','45–59%','<45%'],values:[5,4,3,2,1]},{id:'pc2',label:'Final consonant accuracy',type:'likert',options:['90–100%','75–89%','60–74%','45–59%','<45%'],values:[5,4,3,2,1]},{id:'pc3',label:'Medial consonant accuracy',type:'likert',options:['90–100%','75–89%','60–74%','45–59%','<45%'],values:[5,4,3,2,1]}]},
+      {title:'Error Patterns',questions:[{id:'pc4',label:'Fronting present',type:'likert',options:['Not present (0)','Occasional (1)','Frequent (2)','Consistent (3)'],values:[0,1,2,3]},{id:'pc5',label:'Stopping present',type:'likert',options:['Not present (0)','Occasional (1)','Frequent (2)','Consistent (3)'],values:[0,1,2,3]},{id:'pc6',label:'Cluster reduction',type:'likert',options:['Not present (0)','Occasional (1)','Frequent (2)','Consistent (3)'],values:[0,1,2,3]},{id:'pc7',label:'Syllable structure errors',type:'likert',options:['Not present (0)','Occasional (1)','Frequent (2)','Consistent (3)'],values:[0,1,2,3]}]},
+      {title:'Intelligibility',questions:[{id:'pc8',label:'Intelligibility to familiar listener',type:'likert',options:['100%','75–99%','50–74%','25–49%','<25%'],values:[4,3,2,1,0]},{id:'pc9',label:'Intelligibility to unfamiliar listener',type:'likert',options:['100%','75–99%','50–74%','25–49%','<25%'],values:[4,3,2,1,0]}]}
+    ],
+    scoreInterp:(t)=>{if(t>=25)return{label:'Within Normal Limits',cls:'sv-mild',interp:'Articulation age-appropriate. No intervention at this time.'};if(t>=18)return{label:'Mild Disorder',cls:'sv-mild',interp:'Some errors present. Monitor; targeted therapy may be beneficial.'};if(t>=11)return{label:'Moderate Disorder',cls:'sv-mod',interp:'Multiple errors affecting intelligibility. Therapy recommended.'};return{label:'Severe Disorder',cls:'sv-sev',interp:'Significant impairment. Intensive therapy indicated.'};}
+  },
+  {id:'lang_screen',icon:'🧠',name:'Language Development Screener',desc:'Clinician observation covering receptive and expressive language.',category:'language',duration:'15–25 min',ageRange:'18mo–10yr',
+    sections:[
+      {title:'Receptive Language',questions:[{id:'ls1',label:'Follows multi-step directions',type:'likert',options:['Consistent (0)','Usually (1)','Sometimes (2)','Rarely (3)','Not at all (4)'],values:[0,1,2,3,4]},{id:'ls2',label:'Understands age-appropriate concepts',type:'likert',options:['Age-appropriate (0)','Slightly below (1)','Moderately below (2)','Significantly below (3)'],values:[0,1,2,3]},{id:'ls3',label:'Responds to questions appropriately',type:'likert',options:['Consistent (0)','Usually (1)','Sometimes (2)','Rarely (3)'],values:[0,1,2,3]}]},
+      {title:'Expressive Language',questions:[{id:'ls4',label:'MLU for age',type:'likert',options:['Within limits (0)','Slightly below (1)','Moderately below (2)','Significantly below (3)','No phrases (4)'],values:[0,1,2,3,4]},{id:'ls5',label:'Vocabulary breadth',type:'likert',options:['Age-appropriate (0)','Mild deficit (1)','Moderate deficit (2)','Severe deficit (3)'],values:[0,1,2,3]},{id:'ls6',label:'Grammar / morphosyntax',type:'likert',options:['Age-appropriate (0)','Mild errors (1)','Frequent errors (2)','Very limited (3)'],values:[0,1,2,3]}]},
+      {title:'Pragmatics',questions:[{id:'ls7',label:'Turn-taking in conversation',type:'likert',options:['Appropriate (0)','Mild difficulty (1)','Moderate difficulty (2)','Significant difficulty (3)'],values:[0,1,2,3]},{id:'ls8',label:'Topic maintenance',type:'likert',options:['Appropriate (0)','Mild difficulty (1)','Moderate difficulty (2)','Significant difficulty (3)'],values:[0,1,2,3]}]}
+    ],
+    scoreInterp:(t)=>{if(t<=4)return{label:'Typical Development',cls:'sv-mild',interp:'Language within normal limits. Reassess in 6 months if concerns.'};if(t<=10)return{label:'Mild Delay',cls:'sv-mild',interp:'Some areas below expected. Consider monitoring and parent coaching.'};if(t<=18)return{label:'Moderate Delay',cls:'sv-mod',interp:'Delays across multiple domains. Therapy recommended.'};return{label:'Significant Delay',cls:'sv-sev',interp:'Marked delays. Urgent referral for comprehensive assessment.'};}
+  },
+  {id:'voice_screen',icon:'🎙️',name:'Voice Disorder Screener — VHI-10',desc:'Adapted from Voice Handicap Index. Rates impact on daily life.',category:'voice',duration:'5–10 min',ageRange:'12+',
+    sections:[
+      {title:'Functional Impact',questions:[{id:'vs1',label:'Hard to be heard in noisy places',type:'likert',options:['Never (0)','Almost never (1)','Sometimes (2)','Almost always (3)','Always (4)'],values:[0,1,2,3,4]},{id:'vs2',label:'Difficulty on telephone',type:'likert',options:['Never (0)','Almost never (1)','Sometimes (2)','Almost always (3)','Always (4)'],values:[0,1,2,3,4]},{id:'vs3',label:'Restricts social/personal life',type:'likert',options:['Never (0)','Almost never (1)','Sometimes (2)','Almost always (3)','Always (4)'],values:[0,1,2,3,4]}]},
+      {title:'Physical Symptoms',questions:[{id:'vs4',label:'Voice gives out mid-sentence',type:'likert',options:['Never (0)','Almost never (1)','Sometimes (2)','Almost always (3)','Always (4)'],values:[0,1,2,3,4]},{id:'vs5',label:'Voice quality unpredictable',type:'likert',options:['Never (0)','Almost never (1)','Sometimes (2)','Almost always (3)','Always (4)'],values:[0,1,2,3,4]},{id:'vs6',label:'Vocal effort required',type:'likert',options:['Never (0)','Almost never (1)','Sometimes (2)','Almost always (3)','Always (4)'],values:[0,1,2,3,4]}]},
+      {title:'Emotional Impact',questions:[{id:'vs7',label:'Voice problem upsets patient',type:'likert',options:['Never (0)','Almost never (1)','Sometimes (2)','Almost always (3)','Always (4)'],values:[0,1,2,3,4]},{id:'vs8',label:'Affects employment',type:'likert',options:['Never (0)','Almost never (1)','Sometimes (2)','Almost always (3)','Always (4)'],values:[0,1,2,3,4]},{id:'vs9',label:'Feels left out of conversations',type:'likert',options:['Never (0)','Almost never (1)','Sometimes (2)','Almost always (3)','Always (4)'],values:[0,1,2,3,4]},{id:'vs10',label:'Feels less capable',type:'likert',options:['Never (0)','Almost never (1)','Sometimes (2)','Almost always (3)','Always (4)'],values:[0,1,2,3,4]}]}
+    ],
+    scoreInterp:(t)=>{if(t<=10)return{label:'Minimal Handicap',cls:'sv-mild',interp:'Minimal functional impact. Vocal hygiene education recommended.'};if(t<=20)return{label:'Mild Handicap',cls:'sv-mild',interp:'Moderate impact. Voice therapy likely beneficial.'};if(t<=30)return{label:'Moderate Handicap',cls:'sv-mod',interp:'Significantly affecting quality of life. Therapy strongly recommended.'};return{label:'Severe Handicap',cls:'sv-sev',interp:'Severe impact. Urgent ENT and SLP intervention required.'};}
+  },
+  {id:'aphasia_screen',icon:'🧩',name:'Aphasia Screener — Bedside Communication',desc:'Rapid screening of key language modalities, mobility, swallowing, and diet.',category:'aphasia',duration:'15–20 min',ageRange:'Adult',
+    sections:[
+      {title:'Auditory Comprehension',questions:[{id:'as1',label:'Yes/No reliability',type:'likert',options:['Reliable (0)','Mostly reliable (1)','Inconsistent (2)','Unreliable (3)'],values:[0,1,2,3]},{id:'as2',label:'Single-word comprehension',type:'likert',options:['Intact (0)','Mild (1)','Moderate (2)','Severe (3)'],values:[0,1,2,3]},{id:'as3',label:'Sentence-level comprehension',type:'likert',options:['Intact (0)','Mild (1)','Moderate (2)','Severe (3)'],values:[0,1,2,3]}]},
+      {title:'Verbal Expression',questions:[{id:'as4',label:'Automatic speech',type:'likert',options:['Intact (0)','Mild (1)','Moderate (2)','Severe (3)'],values:[0,1,2,3]},{id:'as5',label:'Confrontation naming',type:'likert',options:['Intact (0)','Mild anomia (1)','Moderate (2)','Severe anomia (3)'],values:[0,1,2,3]},{id:'as6',label:'Conversational fluency',type:'likert',options:['Fluent (0)','Mildly non-fluent (1)','Moderately non-fluent (2)','Non-fluent (3)'],values:[0,1,2,3]}]},
+      {title:'Reading & Writing',questions:[{id:'as7',label:'Single-word reading',type:'likert',options:['Intact (0)','Mild (1)','Moderate (2)','Severe (3)'],values:[0,1,2,3]},{id:'as8',label:'Written naming/copying',type:'likert',options:['Intact (0)','Mild (1)','Moderate (2)','Severe (3)'],values:[0,1,2,3]}]},
+      {title:'Functional Communication',questions:[{id:'as9',label:'Conveys basic needs',type:'likert',options:['Independent (0)','Minimal cues (1)','Moderate cues (2)','Maximal assistance (3)'],values:[0,1,2,3]}]},
+      {title:'Mobility & Physical Status',questions:[
+        {id:'as_mob',label:'Patient mobility status',type:'dropdown',options:['Bedbound — unable to leave bed','Bedbound — can sit up in bed','Chairbound — transfers with assistance','Ambulant with walking aid','Ambulant independently'],values:[]},
+        {id:'as_side',label:'Side affected (hemiplegia/paresis)',type:'dropdown',options:['Not affected','Right-sided hemiplegia','Left-sided hemiplegia','Bilateral involvement','Other / Unknown'],values:[]},
+      ]},
+      {title:'Swallowing (Dysphagia Screening)',questions:[
+        {id:'as_sw',label:'Swallowing ability',type:'dropdown',options:['Normal swallow — no concerns','Mild dysphagia — occasional coughing/throat clearing','Moderate dysphagia — wet voice, delayed swallow','Severe dysphagia — unsafe oral intake','Nil by mouth (NPO) — no oral intake','Not assessed'],values:[]},
+        {id:'as_cough',label:'Cough reflex on swallowing',type:'dropdown',options:['Strong and effective','Weak but present','Absent / Silent aspiration suspected','Not assessed'],values:[]},
+        {id:'as_sal',label:'Saliva management',type:'dropdown',options:['Managing saliva independently','Occasional drooling','Frequent drooling / pooling','Unable to manage saliva'],values:[]},
+      ]},
+      {title:'Diet & Fluid Texture (IDDSI Framework)',questions:[
+        {id:'as_fluid',label:'Recommended fluid level (IDDSI)',type:'dropdown',options:['Level 0 — Thin (water, juice, tea)','Level 1 — Slightly thick','Level 2 — Mildly thick','Level 3 — Moderately thick / Liquidised','Level 4 — Extremely thick','Not applicable / Not assessed'],values:[]},
+        {id:'as_food',label:'Recommended food texture (IDDSI)',type:'dropdown',options:['Level 7 — Regular / Easy to chew','Level 6 — Soft & bite-sized','Level 5 — Minced & moist','Level 4 — Puréed','Level 3 — Liquidised','Level 2 — Mildly thick (blended)','Nil by mouth (NPO)','Not applicable / Not assessed'],values:[]},
+        {id:'as_feed',label:'Feeding method',type:'dropdown',options:['Independent oral feeding','Oral feeding with supervision','Oral feeding with full assistance','Nasogastric tube (NGT)','Percutaneous Endoscopic Gastrostomy (PEG)','Combined oral and tube feeding','Not assessed'],values:[]},
+      ]},
+    ],
+    scoreInterp:(t)=>{if(t<=5)return{label:'Mild / Subclinical',cls:'sv-mild',interp:'Communication largely preserved. Monitoring and functional therapy recommended.'};if(t<=12)return{label:'Mild–Moderate Aphasia',cls:'sv-mod',interp:'Noticeable aphasia. Comprehensive assessment recommended.'};if(t<=20)return{label:'Moderate–Severe Aphasia',cls:'sv-sev',interp:'Significant aphasia. Intensive therapy. AAC evaluation may be appropriate.'};return{label:'Severe Aphasia',cls:'sv-sev',interp:'Profound impairment. AAC strongly recommended. Multidisciplinary involvement essential.'};}
+  },
+  {id:'aphasia_dedicated',icon:'💬',name:'Aphasia Assessment — Language & Communication',desc:'Comprehensive clinician-administered aphasia assessment across all language modalities.',category:'aphasia',duration:'20–40 min',ageRange:'Adult',
+    sections:[
+      {title:'Aphasia Profile',questions:[
+        {id:'aph_type',label:'Aphasia type (clinical impression)',type:'dropdown',options:["Broca's aphasia (non-fluent, comprehension relatively preserved)","Wernicke's aphasia (fluent, impaired comprehension)","Global aphasia (severe impairment across all modalities)","Anomic aphasia (fluent, word-finding difficulties predominant)","Conduction aphasia (repetition disproportionately impaired)","Transcortical motor aphasia","Transcortical sensory aphasia","Mixed / Unclassified"],values:[]},
+        {id:'aph_aetiology',label:'Aetiology',type:'dropdown',options:['Stroke (CVA)','Traumatic brain injury (TBI)','Brain tumour','Neurodegenerative disease','Infection / Encephalitis','Unknown / Under investigation'],values:[]},
+        {id:'aph_onset',label:'Time post-onset',type:'dropdown',options:['Acute (0–7 days)','Sub-acute (1–4 weeks)','Early chronic (1–6 months)','Chronic (6–12 months)','Long-term chronic (>1 year)'],values:[]},
+      ]},
+      {title:'Auditory Comprehension',questions:[
+        {id:'aph1',label:'Yes/No reliability (biographical questions)',type:'likert',options:['Reliable (0)','Mostly reliable (1)','Inconsistent (2)','Unreliable (3)'],values:[0,1,2,3]},
+        {id:'aph2',label:'Single-word comprehension (pointing to named objects)',type:'likert',options:['Intact — 90–100% (0)','Mild impairment — 75–89% (1)','Moderate — 50–74% (2)','Severe — <50% (3)'],values:[0,1,2,3]},
+        {id:'aph3',label:'Sentence-level comprehension',type:'likert',options:['Intact (0)','Mild difficulty (1)','Moderate difficulty (2)','Severely impaired (3)'],values:[0,1,2,3]},
+        {id:'aph4',label:'Following multi-step commands',type:'likert',options:['1 and 2-step: intact (0)','2-step: difficulty (1)','1-step only (2)','Unable to follow (3)'],values:[0,1,2,3]},
+      ]},
+      {title:'Verbal Expression',questions:[
+        {id:'aph5',label:'Speech fluency (conversational output)',type:'likert',options:['Fluent — normal rate & length (0)','Mildly non-fluent (1)','Moderately non-fluent — short phrases (2)','Non-fluent — single words or less (3)'],values:[0,1,2,3]},
+        {id:'aph6',label:'Confrontation naming (common objects)',type:'likert',options:['Intact — minimal errors (0)','Mild anomia — occasional errors (1)','Moderate anomia — frequent errors (2)','Severe anomia — unable to name (3)'],values:[0,1,2,3]},
+        {id:'aph7',label:'Automatic speech (counting, days of week)',type:'likert',options:['Intact (0)','Mild difficulty (1)','Moderate difficulty (2)','Unable (3)'],values:[0,1,2,3]},
+        {id:'aph8',label:'Repetition (words and sentences)',type:'likert',options:['Intact (0)','Words: intact / Phrases: impaired (1)','Moderate impairment (2)','Severely impaired (3)'],values:[0,1,2,3]},
+        {id:'aph9',label:'Paraphasias present',type:'likert',options:['None (0)','Occasional phonemic paraphasias (1)','Frequent paraphasias — semantic or phonemic (2)','Neologisms or jargon (3)'],values:[0,1,2,3]},
+      ]},
+      {title:'Reading',questions:[
+        {id:'aph10',label:'Single-word reading aloud',type:'likert',options:['Intact (0)','Mild impairment (1)','Moderate impairment (2)','Severely impaired / Unable (3)'],values:[0,1,2,3]},
+        {id:'aph11',label:'Reading comprehension (word-to-picture matching)',type:'likert',options:['Intact (0)','Mild impairment (1)','Moderate impairment (2)','Severely impaired (3)'],values:[0,1,2,3]},
+      ]},
+      {title:'Writing',questions:[
+        {id:'aph12',label:'Written naming (written picture naming)',type:'likert',options:['Intact (0)','Mild impairment — occasional errors (1)','Moderate impairment (2)','Severely impaired (3)'],values:[0,1,2,3]},
+        {id:'aph13',label:'Copying written words',type:'likert',options:['Accurate (0)','Minor errors (1)','Moderate errors (2)','Unable to copy (3)'],values:[0,1,2,3]},
+      ]},
+      {title:'Functional Communication',questions:[
+        {id:'aph14',label:'Ability to convey basic needs / wants',type:'likert',options:['Independent (0)','Needs minimal cueing (1)','Needs moderate cueing (2)','Needs maximal assistance (3)'],values:[0,1,2,3]},
+        {id:'aph15',label:'Use of compensatory strategies (gesture, drawing, writing)',type:'likert',options:['Uses effectively without prompting (0)','Uses with prompting (1)','Attempts but limited success (2)','Does not use compensatory strategies (3)'],values:[0,1,2,3]},
+        {id:'aph_severity',label:'Overall functional severity (ASHA FACS impression)',type:'dropdown',options:['Level 6 — Communicates without assistance in most situations','Level 5 — Communicates with minimal assistance','Level 4 — Communicates with moderate assistance','Level 3 — Communicates with maximum assistance','Level 2 — Rarely communicates successfully','Level 1 — Does not communicate functionally'],values:[]},
+      ]},
+      {title:'AAC & Support Needs',questions:[
+        {id:'aph_aac',label:'AAC recommendation',type:'dropdown',options:['Not indicated at this time','Low-tech AAC recommended (communication book, alphabet board)','High-tech AAC recommended (speech-generating device)','Currently using AAC — review required','Trial period of AAC to be conducted'],values:[]},
+        {id:'aph_family',label:'Family / caregiver training recommended',type:'dropdown',options:['Yes — supported conversation techniques','Yes — AAC training for caregiver','Yes — general communication strategies','Already receiving — review recommended','Not indicated at this time'],values:[]},
+      ]},
+    ],
+    scoreInterp:(t)=>{
+      if(t<=8)return{label:'Mild Aphasia',cls:'sv-mild',interp:'Mild language impairment. Word-finding and complex sentence comprehension may be affected. Functional communication largely maintained. Targeted therapy and compensatory strategy training recommended.'};
+      if(t<=20)return{label:'Moderate Aphasia',cls:'sv-mod',interp:'Moderate aphasia affecting multiple language modalities. Functional communication is effortful. Direct therapy across comprehension, expression, reading and writing indicated. Consider AAC support.'};
+      if(t<=32)return{label:'Severe Aphasia',cls:'sv-sev',interp:'Severe aphasia with profound impairment across language modalities. Intensive SLT recommended. AAC strongly indicated. Family/caregiver training is essential.'};
+      return{label:'Very Severe / Global Aphasia',cls:'sv-sev',interp:'Global or near-global aphasia. Communication is severely restricted. Immediate AAC evaluation, MDT involvement, and intensive caregiver training required.'};
+    }
+  }
+];
+
+
+var aState={toolId:null,answers:{},dropdowns:{},patientId:null,notes:''};
+
+function renderAssessments(){
+  document.getElementById('assess-sub').textContent='Clinical screening tools';
+  document.getElementById('assess-acts').innerHTML='';
+  var cards=ASSESS_TOOLS.map(function(t){
+    return '<div class="acard" onclick="startAssess(\''+t.id+'\')">'+
+      '<div style="font-size:30px;margin-bottom:8px">'+t.icon+'</div>'+
+      '<div style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px">'+xe(t.name)+'</div>'+
+      '<div style="font-size:12px;color:var(--muted);line-height:1.4">'+xe(t.desc)+'</div>'+
+      '<div style="font-size:11px;color:var(--teal);margin-top:8px;font-weight:600">'+xe(t.ageRange)+' · '+xe(t.duration)+'</div>'+
+    '</div>';
+  }).join('');
+  document.getElementById('assess-body').innerHTML=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'+
+      '<div style="font-size:13px;color:var(--muted)">Select a tool to begin an assessment</div>'+
+      '<button class="btn btn-s btn-sm" onclick="showAssessHistory()">📋 View History</button>'+
+    '</div>'+
+    '<div class="pgrid">'+cards+'</div>';
+}
+
+async function showAssessHistory(){
+  document.getElementById('assess-sub').textContent='Assessment history';
+  document.getElementById('assess-acts').innerHTML='<button class="btn btn-s" onclick="renderAssessments()">← Back</button>';
+  var {data:list}=await sb.from('assessments').select('*,patients(fname,lname)').eq('therapist_id',curUser.id).order('date',{ascending:false});
+  if(!list||!list.length){
+    document.getElementById('assess-body').innerHTML='<div class="es"><div class="ei">📋</div><h3>No assessments yet</h3><p>Run your first assessment from the tools list.</p></div>';
+    return;
+  }
+  document.getElementById('assess-body').innerHTML='<div class="slist">'+list.map(function(a){
+    var tool=ASSESS_TOOLS.find(function(x){return x.id===a.tool_id;});
+    var pname=a.patients?a.patients.fname+' '+a.patients.lname:'Unknown';
+    return '<div class="si">'+
+      '<div class="sdate">'+fmtDate(a.date)+'</div>'+
+      '<div class="sinfo"><div class="stitle">'+(tool?tool.icon+' '+xe(tool.name):xe(a.tool_id))+'</div>'+
+      '<div class="smeta"><span>👤 '+xe(pname)+'</span><span>Score: '+a.total+'</span><span>'+xe(a.severity||'')+'</span></div></div>'+
+      '<button class="btn btn-s btn-sm" onclick="viewAssessResult(\''+a.id+'\')">View</button>'+
+      '<button class="btn btn-d btn-sm" onclick="delAssess(\''+a.id+'\')">🗑</button>'+
+    '</div>';
+  }).join('')+'</div>';
+}
+
+async function startAssess(toolId){
+  var tool=ASSESS_TOOLS.find(function(t){return t.id===toolId;});
+  if(!tool)return;
+  aState={toolId:toolId,answers:{},dropdowns:{},patientId:curPatient?curPatient.id:null,notes:''};
+  document.getElementById('assess-sub').textContent=tool.name;
+  document.getElementById('assess-acts').innerHTML='<button class="btn btn-s" onclick="renderAssessments()">← Back</button>';
+  var {data:pts}=await sb.from('patients').select('id,fname,lname').eq('therapist_id',curUser.id).eq('status','active').order('lname');
+  var pOpts=(pts||[]).map(function(p){return '<option value="'+p.id+'">'+xe(p.fname)+' '+xe(p.lname)+'</option>';}).join('');
+  var sectionsHtml=tool.sections.map(function(sec){
+    var qHtml=sec.questions.map(function(q){
+      var input;
+      if(q.type==='dropdown'){
+        input='<select class="fs" id="dd-'+q.id+'" onchange="pickDropdown(\''+q.id+'\',this.value)" style="max-width:420px;margin-top:4px"><option value="">— Select —</option>'+
+          q.options.map(function(opt){return '<option value="'+xe(opt)+'">'+xe(opt)+'</option>';}).join('')+'</select>';
+      } else {
+        input='<div class="lrow">'+q.options.map(function(opt,i){
+          return '<button class="lb" id="lb-'+q.id+'-'+i+'" onclick="pickAnswer(\''+q.id+'\','+q.values[i]+','+i+')">'+xe(opt)+'</button>';
+        }).join('')+'</div>';
+      }
+      return '<div class="aq"><div class="aql">'+xe(q.label)+'</div>'+(q.sub?'<div class="aqs">'+xe(q.sub)+'</div>':'')+input+'</div>';
+    }).join('');
+    return '<div class="asec"><h3>'+xe(sec.title)+'</h3>'+qHtml+'</div>';
+  }).join('');
+  document.getElementById('assess-body').innerHTML=
+    '<div class="apanel">'+
+      '<h2>'+tool.icon+' '+xe(tool.name)+'</h2>'+
+      '<div class="aps">'+xe(tool.desc)+' · '+xe(tool.ageRange)+' · '+xe(tool.duration)+'</div>'+
+      '<div class="asec"><h3>Patient &amp; Date</h3><div class="fg" style="max-width:500px">'+
+        '<div class="fi"><label>Patient *</label><select id="a-pat" onchange="aState.patientId=this.value"><option value="">Select…</option>'+pOpts+'</select></div>'+
+        '<div class="fi"><label>Date</label><input type="date" id="a-date" value="'+today()+'"></div>'+
+        '<div class="fi"><label>Location</label><select id="a-loc"><option value="">Select…</option>'+LOCATIONS.map(function(l){return '<option>'+l+'</option>';}).join('')+'</select></div>'+
+      '</div></div>'+
+      sectionsHtml+
+      '<div class="asec"><h3>ICF Framework</h3>'+
+        '<div class="fg">'+
+          '<div class="fi"><label>Health Condition</label><input id="icf-hc"></div>'+
+          '<div class="fi"><label>Body Functions &amp; Structures</label><input id="icf-bf"></div>'+
+          '<div class="fi"><label>Activity</label><input id="icf-act"></div>'+
+          '<div class="fi"><label>Participation</label><input id="icf-part"></div>'+
+          '<div class="fi"><label>Environmental Factors</label><input id="icf-env"></div>'+
+          '<div class="fi"><label>Personal Factors</label><input id="icf-pers"></div>'+
+        '</div>'+
+        '<div class="fi" style="margin-top:10px"><label>ICF Summary / Narrative</label><textarea class="atx" id="icf-notes" rows="3"></textarea></div>'+
+      '</div>'+
+      '<div class="asec"><h3>Clinical Notes</h3><textarea class="atx" id="a-notes" placeholder="Observations, context, patient behaviour…"></textarea></div>'+
+      '<div id="a-result"></div>'+
+      '<div style="display:flex;gap:12px;margin-top:24px">'+
+        '<button class="btn btn-p" onclick="scoreAssess(\''+tool.id+'\')">Calculate Score &amp; Save</button>'+
+        '<button class="btn btn-s" onclick="renderAssessments()">Cancel</button>'+
+      '</div>'+
+    '</div>';
+  if(curPatient){document.getElementById('a-pat').value=curPatient.id;aState.patientId=curPatient.id;}
+}
+
+function pickAnswer(qId,val,idx){
+  aState.answers[qId]=val;
+  document.querySelectorAll('[id^="lb-'+qId+'-"]').forEach(function(b){b.classList.remove('sel');});
+  document.getElementById('lb-'+qId+'-'+idx).classList.add('sel');
+}
+
+function pickDropdown(qId,val){
+  aState.dropdowns=aState.dropdowns||{};
+  aState.dropdowns[qId]=val;
+}
+
+async function scoreAssess(toolId){
+  var tool=ASSESS_TOOLS.find(function(t){return t.id===toolId;});
+  if(!tool)return;
+  aState.patientId=document.getElementById('a-pat').value;
+  aState.notes=document.getElementById('a-notes').value.trim();
+  if(!aState.patientId){toast('⚠️ Select a patient first.');return;}
+  var scoredQ=[],dropQ=[];
+  tool.sections.forEach(function(s){s.questions.forEach(function(q){if(q.type==='dropdown')dropQ.push(q.id);else scoredQ.push(q.id);});});
+  var unanswered=scoredQ.filter(function(id){return aState.answers[id]===undefined;});
+  if(unanswered.length){toast('⚠️ '+unanswered.length+' scored question(s) unanswered.');return;}
+  aState.dropdowns=aState.dropdowns||{};
+  dropQ.forEach(function(id){var el=document.getElementById('dd-'+id);if(el&&el.value)aState.dropdowns[id]=el.value;});
+  var total=Object.values(aState.answers).reduce(function(a,b){return a+b;},0);
+  var interp=tool.scoreInterp(total);
+  var icf={
+    hc:document.getElementById('icf-hc').value.trim(),
+    bf:document.getElementById('icf-bf').value.trim(),
+    act:document.getElementById('icf-act').value.trim(),
+    part:document.getElementById('icf-part').value.trim(),
+    env:document.getElementById('icf-env').value.trim(),
+    pers:document.getElementById('icf-pers').value.trim(),
+    notes:document.getElementById('icf-notes').value.trim()
+  };
+  var ddSummary=dropQ.filter(function(id){return aState.dropdowns[id];}).map(function(id){
+    var q=null;
+    tool.sections.forEach(function(s){s.questions.forEach(function(x){if(x.id===id)q=x;});});
+    return q?'<div style="font-size:13px;margin-top:4px"><strong>'+xe(q.label)+':</strong> '+xe(aState.dropdowns[id])+'</div>':'';
+  }).join('');
+  document.getElementById('a-result').innerHTML=
+    '<div class="ares '+interp.cls+'" style="margin-top:0">'+
+      '<div style="display:flex;align-items:flex-start;gap:24px">'+
+        '<div><div class="arsc">'+total+'</div><div style="font-size:11px;opacity:.7;margin-top:2px">Total Score</div></div>'+
+        '<div style="flex:1"><div class="arl">Severity: '+interp.label+'</div><div class="ari" style="margin-top:6px">'+interp.interp+'</div>'+
+          (ddSummary?'<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(0,0,0,0.08)"><strong style="font-size:12px;text-transform:uppercase;letter-spacing:.5px">Clinical Observations</strong>'+ddSummary+'</div>':'')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  var {error}=await sb.from('assessments').insert({
+    therapist_id:curUser.id,
+    patient_id:aState.patientId,
+    tool_id:toolId,
+    date:document.getElementById('a-date').value||today(),
+    location:document.getElementById('a-loc').value,
+    answers:aState.answers,
+    dropdowns:aState.dropdowns||{},
+    icf:icf,
+    total:total,
+    severity:interp.label,
+    notes:aState.notes
+  });
+  if(error){toast('❌ '+error.message);return;}
+  toast('✅ Assessment saved!');
+  document.getElementById('a-result').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function viewAssessResult(rid){
+  var {data:a}=await sb.from('assessments').select('*,patients(fname,lname)').eq('id',rid).single();
+  if(!a)return;
+  var tool=ASSESS_TOOLS.find(function(x){return x.id===a.tool_id;});
+  var pname=a.patients?a.patients.fname+' '+a.patients.lname:'Unknown';
+  var icf=a.icf||{};
+  var icfRows='';
+  if(icf.hc||icf.bf||icf.act||icf.part||icf.env||icf.pers||icf.notes){
+    icfRows='<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">'+
+      '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--teal);margin-bottom:8px">ICF Framework</div>'+
+      '<table style="width:100%;font-size:13px;border-collapse:collapse">'+
+      [['Health Condition',icf.hc],['Body Functions & Structures',icf.bf],['Activity',icf.act],['Participation',icf.part],['Environmental Factors',icf.env],['Personal Factors',icf.pers]].map(function(r){
+        return '<tr><td style="padding:4px 8px 4px 0;color:var(--muted);white-space:nowrap;vertical-align:top">'+r[0]+'</td><td style="padding:4px 0">'+xe(r[1]||'—')+'</td></tr>';
+      }).join('')+
+      '</table>'+
+      (icf.notes?'<div style="margin-top:8px;font-size:13px;color:var(--ink-soft);line-height:1.5">'+xe(icf.notes)+'</div>':'')+
+    '</div>';
+  }
+  document.getElementById('assess-sub').textContent='Assessment result';
+  document.getElementById('assess-acts').innerHTML='<button class="btn btn-s" onclick="showAssessHistory()">← Back</button>';
+  document.getElementById('assess-body').innerHTML=
+    '<div class="apanel">'+
+      '<h2>'+(tool?tool.icon+' '+xe(tool.name):xe(a.tool_id))+'</h2>'+
+      '<div class="aps">👤 '+xe(pname)+' · 📅 '+fmtDate(a.date)+(a.location?' · 📍 '+xe(a.location):'')+'</div>'+
+      '<div class="ares" style="margin-top:0"><div style="display:flex;align-items:flex-start;gap:24px">'+
+        '<div><div class="arsc">'+a.total+'</div><div style="font-size:11px;opacity:.7">Total Score</div></div>'+
+        '<div style="flex:1"><div class="arl">Severity: '+xe(a.severity||'')+'</div>'+
+        (a.notes?'<div class="ari" style="margin-top:8px">'+xe(a.notes)+'</div>':'')+'</div>'+
+      '</div></div>'+
+      icfRows+
+    '</div>';
+}
+
+async function delAssess(rid){
+  if(!confirm('Delete this assessment?'))return;
+  await sb.from('assessments').delete().eq('id',rid);
+  toast('🗑 Assessment deleted.');
+  showAssessHistory();
+}
+
+
+// ═══════════════════════════════════════════════
+//  REPORTS (analytics + clinical report + Word/PDF)
+// ═══════════════════════════════════════════════
+var curRepTab='analytics';
+var _repData={patient:null,sessions:[],goals:[],appts:[],assessments:[]};
+
+function age(dob){ if(!dob)return'?'; return Math.floor((Date.now()-new Date(dob).getTime())/(1000*60*60*24*365.25)); }
+function scCls(s){ return s>=80?'badge-green':s>=60?'badge-amber':'badge-red'; }
+
+function renderReports(){ switchRepTab(curRepTab); }
+
+function switchRepTab(tab){
+  curRepTab=tab;
+  document.getElementById('rt-analytics').classList.toggle('on',tab==='analytics');
+  document.getElementById('rt-clinical').classList.toggle('on',tab==='clinical');
+  if(tab==='analytics') renderAnalytics();
+  else renderClinicalBuilder();
+}
+
+async function renderAnalytics(){
+  document.getElementById('rep-sub').textContent='Practice analytics';
+  var body=document.getElementById('rep-body');
+  body.innerHTML='<div class="es"><div class="spinner"></div></div>';
+  var [pts,sess,appts,assess,goals]=await Promise.all([
+    sb.from('patients').select('*').eq('therapist_id',curUser.id),
+    sb.from('sessions').select('date,score,location').eq('therapist_id',curUser.id),
+    sb.from('appointments').select('status').eq('therapist_id',curUser.id),
+    sb.from('assessments').select('tool_id,severity').eq('therapist_id',curUser.id),
+    sb.from('goals').select('status').eq('therapist_id',curUser.id)
+  ]);
+  var patients=pts.data||[], sessions=sess.data||[], appointments=appts.data||[], assessments=assess.data||[], goalsList=goals.data||[];
+  var condCounts={}; patients.forEach(function(p){(p.conditions||[]).forEach(function(c){condCounts[c]=(condCounts[c]||0)+1;});});
+  var locCounts={}; sessions.forEach(function(s){if(s.location)locCounts[s.location]=(locCounts[s.location]||0)+1;});
+  var apptStatus={}; appointments.forEach(function(a){apptStatus[a.status]=(apptStatus[a.status]||0)+1;});
+  var scored=sessions.filter(function(s){return s.score!=null;});
+  var avgScore=scored.length?Math.round(scored.reduce(function(a,s){return a+s.score;},0)/scored.length):0;
+  function barChart(title,data,color){
+    var entries=Object.entries(data).sort(function(a,b){return b[1]-a[1];});
+    if(!entries.length)return '<div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:8px">'+title+'</div><div style="font-size:12px;color:var(--muted)">No data yet</div></div>';
+    var max=Math.max.apply(null,entries.map(function(e){return e[1];}));
+    return '<div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:12px">'+title+'</div>'+
+      entries.map(function(e){var label=COND_LABELS[e[0]]||e[0];
+        return '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>'+xe(label)+'</span><span style="font-weight:700">'+e[1]+'</span></div>'+
+          '<div style="background:var(--sand-dark);border-radius:4px;height:8px"><div style="background:'+color+';height:8px;border-radius:4px;width:'+(e[1]/max*100)+'%"></div></div></div>';
+      }).join('')+'</div>';
+  }
+  body.innerHTML=
+    '<div class="stats">'+
+      '<div class="stat"><div class="stat-val">'+patients.length+'</div><div class="stat-lbl">Total Patients</div></div>'+
+      '<div class="stat"><div class="stat-val">'+sessions.length+'</div><div class="stat-lbl">Total Sessions</div></div>'+
+      '<div class="stat"><div class="stat-val">'+assessments.length+'</div><div class="stat-lbl">Assessments Done</div></div>'+
+      '<div class="stat"><div class="stat-val">'+avgScore+'%</div><div class="stat-lbl">Avg Session Score</div></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'+
+      barChart('Patients by Condition',condCounts,'#2A7F7F')+
+      barChart('Sessions by Location',locCounts,'#5c9ee0')+
+      barChart('Appointments by Status',apptStatus,'#8e5ce0')+
+      '<div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:12px">Goals Overview</div>'+
+        '<div style="font-size:13px;line-height:2">'+
+        '<div>Active: <strong>'+goalsList.filter(function(g){return g.status==='active';}).length+'</strong></div>'+
+        '<div>Achieved: <strong>'+goalsList.filter(function(g){return g.status==='achieved';}).length+'</strong></div>'+
+        '<div>Total: <strong>'+goalsList.length+'</strong></div>'+
+        '</div></div>'+
+    '</div>';
+}
+
+async function renderClinicalBuilder(){
+  document.getElementById('rep-sub').textContent='Generate a clinical report';
+  var body=document.getElementById('rep-body');
+  var {data:pts}=await sb.from('patients').select('id,fname,lname').eq('therapist_id',curUser.id).order('lname');
+  var opts=(pts||[]).map(function(p){return '<option value="'+p.id+'">'+xe(p.fname)+' '+xe(p.lname)+'</option>';}).join('');
+  body.innerHTML=
+    '<div style="max-width:900px">'+
+      '<div id="cr-panel-generic">'+
+        '<div class="card" style="margin-bottom:20px">'+
+          '<div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--teal);margin-bottom:14px">Step 1 — Select Patient & Sessions</div>'+
+          '<div class="fg" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px">'+
+            '<div class="fi"><label>Patient *</label><select id="cr-pat" onchange="loadCrSessions();loadCrAssessments();"><option value="">Choose patient…</option>'+opts+'</select></div>'+
+            '<div class="fi"><label>Report Type</label><select id="cr-type"><option value="progress">Progress Report</option><option value="initial">Initial Assessment</option><option value="discharge">Discharge Summary</option><option value="referral">Referral Letter</option><option value="review">Periodic Review</option></select></div>'+
+            '<div class="fi"><label>Addressed To</label><input id="cr-to" placeholder="e.g. Dr. Pillay, GP"></div>'+
+            '<div class="fi"><label>Reporting Clinician</label><input id="cr-cli" placeholder="Your name & qualifications"></div>'+
+            '<div class="fi"><label>Clinic / Practice</label><input id="cr-clinic" placeholder="e.g. SpeechCare Clinic"></div>'+
+          '</div>'+
+          '<div id="cr-sess-wrap" style="display:none">'+
+            '<label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);display:block;margin-bottom:8px">Select Sessions to Include</label>'+
+            '<div id="cr-sess-list" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;border:1.5px solid var(--border);border-radius:7px;padding:10px;background:var(--sand)"></div>'+
+            '<div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-s btn-sm" onclick="selAllSess(true)">Select All</button><button class="btn btn-s btn-sm" onclick="selAllSess(false)">Deselect All</button></div>'+
+          '</div>'+
+          '<div id="cr-assess-wrap" style="display:none;margin-top:16px">'+
+            '<label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-soft);display:block;margin-bottom:8px">Select Assessments to Include</label>'+
+            '<div id="cr-assess-list" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;border:1.5px solid var(--border);border-radius:7px;padding:10px;background:var(--sand)"></div>'+
+            '<div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-s btn-sm" onclick="selAllAssess(true)">Select All</button><button class="btn btn-s btn-sm" onclick="selAllAssess(false)">Deselect All</button></div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="card" style="margin-bottom:20px">'+
+          '<div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--teal);margin-bottom:12px">Step 2 — Generate Report</div>'+
+          '<div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.5">Built from a structured clinical template. Pulls in session notes, assessment results, goals, and attendance.</div>'+
+          '<button class="btn btn-p" onclick="generateReport()">📄 Generate Report</button>'+
+        '</div>'+
+      '</div>'+
+      '<div id="cr-out" style="display:none;margin-top:20px">'+
+        '<div class="card">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">'+
+            '<div style="font-size:14px;font-weight:700;color:var(--teal)">Generated Report</div>'+
+            '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+              '<button class="btn btn-p btn-sm" onclick="downloadDocx()">⬇️ Download Word (.docx)</button>'+
+              '<button class="btn btn-s btn-sm" onclick="printReport()">🖨️ Print / Save PDF</button>'+
+            '</div>'+
+          '</div>'+
+          '<div id="cr-content" style="background:white;padding:32px;border:1px solid var(--border);border-radius:8px;font-family:Georgia,serif;line-height:1.6;color:#1a1a2e"></div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+}
+
+async function loadCrSessions(){
+  var pid=document.getElementById('cr-pat').value;
+  var wrap=document.getElementById('cr-sess-wrap');
+  var list=document.getElementById('cr-sess-list');
+  if(!pid){wrap.style.display='none';return;}
+  var {data:sess}=await sb.from('sessions').select('*').eq('patient_id',pid).order('date',{ascending:false});
+  wrap.style.display='block';
+  if(!sess||!sess.length){list.innerHTML='<div style="font-size:13px;color:var(--muted)">No sessions for this patient yet.</div>';return;}
+  list.innerHTML=sess.map(function(s){
+    return '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 4px;border-radius:5px">'+
+      '<input type="checkbox" class="cr-cb" value="'+s.id+'" checked style="accent-color:var(--teal);width:15px;height:15px">'+
+      '<span style="font-size:13px"><strong>'+fmtDate(s.date)+'</strong> — '+xe(s.title||'Session')+' '+(s.score!=null?'<span class="badge '+scCls(s.score)+'" style="margin-left:6px">'+s.score+'%</span>':'')+'</span>'+
+    '</label>';
+  }).join('');
+}
+function selAllSess(v){ document.querySelectorAll('.cr-cb').forEach(function(cb){cb.checked=v;}); }
+
+async function loadCrAssessments(){
+  var pid=document.getElementById('cr-pat').value;
+  var wrap=document.getElementById('cr-assess-wrap');
+  var list=document.getElementById('cr-assess-list');
+  if(!pid){if(wrap)wrap.style.display='none';return;}
+  var {data:assessments}=await sb.from('assessments').select('*').eq('patient_id',pid).order('date',{ascending:false});
+  if(wrap)wrap.style.display='block';
+  if(!list)return;
+  if(!assessments||!assessments.length){list.innerHTML='<div style="font-size:13px;color:var(--muted)">No assessments recorded for this patient yet.</div>';return;}
+  list.innerHTML=assessments.map(function(a){
+    var tool=ASSESS_TOOLS.find(function(t){return t.id===a.tool_id;});
+    var toolName=tool?tool.name:a.tool_id;
+    var sevColor=a.severity&&a.severity.toLowerCase().includes('severe')?'var(--red)':a.severity&&a.severity.toLowerCase().includes('mild')?'var(--green)':'var(--amber)';
+    return '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 4px;border-radius:5px">'+
+      '<input type="checkbox" class="cr-assess-cb" value="'+a.id+'" checked style="accent-color:var(--teal);width:15px;height:15px">'+
+      '<span style="font-size:13px"><strong>'+fmtDate(a.date)+'</strong> — '+xe(toolName)+' <span style="color:'+sevColor+';font-weight:600;font-size:11px;margin-left:6px">'+xe(a.severity||'')+'</span> <span style="color:var(--muted);font-size:11px">(score: '+a.total+')</span></span>'+
+    '</label>';
+  }).join('');
+}
+function selAllAssess(v){ document.querySelectorAll('.cr-assess-cb').forEach(function(cb){cb.checked=v;}); }
+async function generateReport(){
+  const pid=document.getElementById('cr-pat').value;
+  if(!pid){toast('⚠️ Please select a patient.');return;}
+
+  const {data:patient}=await sb.from('patients').select('*').eq('id',pid).single();
+  if(!patient){toast('⚠️ Patient not found.');return;}
+
+  // Sessions are optional — get all selected ones (may be zero)
+  const selIds=[...document.querySelectorAll('.cr-cb:checked')].map(cb=>cb.value);
+  const {data:_allSess}=await sb.from('sessions').select('*').eq('patient_id',pid);
+  const allPatSessions=_allSess||[];
+  const sessions=allPatSessions.filter(s=>selIds.includes(s.id)).sort((a,b)=>a.date.localeCompare(b.date));
+
+  const {data:_goals}=await sb.from('goals').select('*').eq('patient_id',pid);
+  const goals=_goals||[];
+  const {data:_appts}=await sb.from('appointments').select('*').eq('patient_id',pid);
+  const appts=_appts||[];
+  const {data:_assess}=await sb.from('assessments').select('*').eq('patient_id',pid);
+  const allAssessments=_assess||[];
+  const selAssessIds=[...document.querySelectorAll('.cr-assess-cb:checked')].map(cb=>cb.value);
+  const ptAssess=selAssessIds.length>0
+    ?allAssessments.filter(a=>a.patient_id===pid&&selAssessIds.includes(a.id))
+    :allAssessments.filter(a=>a.patient_id===pid);
+  const rtype=document.getElementById('cr-type').value;
+  const addressee=document.getElementById('cr-to').value.trim();
+  const clinician=document.getElementById('cr-cli').value.trim()||'Speech-Language Pathologist';
+  const clinic=document.getElementById('cr-clinic').value.trim();
+
+  const patName=patient.fname+' '+patient.lname;
+  const attended=appts.filter(a=>a.status==='completed').length;
+  const noshow=appts.filter(a=>a.status==='no-show').length;
+  const attRate=appts.length?Math.round(attended/appts.length*100):null;
+  const avgSc=sessions.filter(s=>s.score!=null).length?Math.round(sessions.filter(s=>s.score!=null).reduce((a,b,_,ar)=>a+b.score/ar.length,0)):null;
+  const totalHrs=(sessions.reduce((a,b)=>a+(b.duration||45),0)/60).toFixed(1);
+  const conds=(patient.conditions||[]).map(c=>COND_LABELS[c]||c).join(', ')||'Not specified';
+  const RTITLES={progress:'Speech-Language Therapy Progress Report',initial:'Initial SLP Assessment Report',discharge:'Discharge Summary — Speech-Language Therapy',referral:'Referral Letter — Speech-Language Pathology',review:'Periodic Review Report — Speech-Language Therapy'};
+
+  // Progress description (only relevant if sessions exist)
+  const pcnt={}; sessions.forEach(s=>{if(s.progress)pcnt[s.progress]=(pcnt[s.progress]||0)+1;});
+  const domProg=Object.entries(pcnt).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  const PDESC={Excellent:'demonstrated excellent progress, consistently exceeding expected therapeutic benchmarks',Good:'demonstrated good progress, meeting the majority of short-term objectives',Moderate:'demonstrated moderate progress, with incremental gains noted',Limited:'demonstrated limited progress; response to intervention has been variable',Regression:'demonstrated regression in one or more target areas'};
+
+  // Recommendations
+  const RECS={
+    stuttering:['Continue fluency shaping and/or stuttering modification techniques.','Gradual transfer of fluency skills to increasingly challenging communicative contexts.','Consider group therapy or peer support to address psychosocial sequelae of stuttering.','Re-administer SSI-4 at next review to monitor severity.'],
+    articulation:['Continue phoneme-specific intervention (isolation → syllable → word → phrase → conversation).','Implement minimal pair therapy to strengthen phonemic contrasts.','Collaborate with teacher/parent to generalise target sounds to naturalistic environments.','Reassess intelligibility and PCC at next review.'],
+    language:['Target identified deficits in receptive and/or expressive language domains.','Engage caregivers in facilitation strategies (expansion, modelling, recasting).','Consider referral for educational assessment if academic performance is affected.','Re-administer standardised language assessment at next review.'],
+    voice:['Continue vocal hygiene programme: hydration, voice rest, reduce laryngeal irritants.','Refer to ENT for laryngoscopic evaluation if not already completed.','Implement resonant voice or semi-occluded vocal tract exercises.','Reassess using VHI-10 at next review.'],
+    aphasia:['Continue multi-modal communication strategies (written, gesture, AAC).','Family/caregiver training in supported conversation techniques is strongly recommended.','Consider neuropsychology referral if cognitive-communicative comorbidities are suspected.','Review functional communication goals at each session.'],
+  };
+  const recList=[]; (patient.conditions||[]).forEach(c=>{if(RECS[c])recList.push(...RECS[c]);});
+  if(!recList.length)recList.push('Commence therapy programme and establish SMART treatment goals at the next scheduled session.');
+
+  // Glossary
+  const GLOS={
+    stuttering:[['Stuttering (Stammering)','A fluency disorder characterised by disruptions in speech including repetitions of sounds/words, prolongations, and complete blocks.'],['Fluency Shaping','A therapeutic approach targeting speech motor patterns — breath support, phonation onset, and rate — to establish fluent speech.'],['% Syllables Stuttered (%SS)','A standard measure of stuttering frequency expressed as the percentage of syllables containing a moment of stuttering.'],['Secondary Behaviours','Physical escape and avoidance behaviours (facial grimaces, eye blinking) that develop as a response to stuttering.']],
+    articulation:[['Articulation Disorder','Errors in the production of individual phonemes including substitutions, omissions, distortions, or additions.'],['Phonological Process','A systematic speech sound simplification pattern observed in development (e.g. fronting, stopping, cluster reduction).'],['PCC (Percentage of Consonants Correct)','A metric quantifying articulatory accuracy by calculating the proportion of correctly produced consonants in a speech sample.'],['Intelligibility','The degree to which a listener can understand a speaker\'s intended message, typically expressed as a percentage.']],
+    language:[['Language Delay','Acquisition of language milestones significantly behind age-expected norms without an identified neurological cause.'],['Receptive Language','The ability to understand spoken, written, or gestural language including vocabulary and sentence processing.'],['Expressive Language','The ability to communicate ideas through spoken words, sentences, writing, or augmentative means.'],['MLU (Mean Length of Utterance)','The average number of morphemes per utterance; a standard index of grammatical development.']],
+    voice:[['Dysphonia','Any condition in which voice quality, pitch, loudness, or resonance deviates from what is typical for the speaker\'s age and gender.'],['Vocal Hygiene','Behaviours maintaining vocal fold health: adequate hydration, voice rest, avoidance of laryngeal irritants.'],['VHI (Voice Handicap Index)','A standardised self-report instrument measuring the perceived functional, physical, and emotional impact of a voice disorder.'],['Phonation','The process of sound production through periodic vibration of the vocal folds driven by subglottic air pressure.']],
+    aphasia:[['Aphasia','An acquired neurogenic language disorder, most commonly resulting from stroke, impairing ability to speak, understand, read, and/or write.'],['Anomia','Difficulty retrieving and producing specific words during speech or naming tasks; the most common symptom across all aphasia types.'],['AAC (Augmentative & Alternative Communication)','Strategies and devices supplementing or replacing natural speech including picture boards and speech-generating devices.'],['Functional Communication','The ability to convey basic wants, needs, and information in everyday contexts regardless of linguistic accuracy.'],['Dysphagia','Difficulty or discomfort in swallowing, which may affect the safety and efficiency of oral intake.'],['IDDSI','International Dysphagia Diet Standardisation Initiative — a global framework defining food and fluid texture levels (0–7).']],
+  };
+  const gterms=[]; const seen=new Set();
+  (patient.conditions||[]).forEach(c=>(GLOS[c]||[]).forEach(([t,d])=>{if(!seen.has(t)){seen.add(t);gterms.push([t,d]);}}));
+  if(!gterms.length)gterms.push(['Speech-Language Pathology','The clinical discipline concerned with the assessment and treatment of communication and swallowing disorders.']);
+
+  // Build HTML report
+  const html=`
+    <div style="text-align:center;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #2A7F7F">
+      ${clinic?`<div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#2A7F7F;margin-bottom:4px">${xe(clinic)}</div>`:''}
+      <div style="font-size:20px;font-weight:900;color:#1A1A2E;margin-bottom:4px">${RTITLES[rtype]||'Clinical Report'}</div>
+      <div style="font-size:13px;color:#8888A8">Date: ${fmtDate(today())}${addressee?' &nbsp;|&nbsp; To: '+xe(addressee):''}</div>
+    </div>
+
+    <h2>1. Patient Information</h2>
+    <table><tr><th style="width:35%">Field</th><th>Details</th></tr>
+      <tr><td>Full Name</td><td>${xe(patName)}</td></tr>
+      <tr><td>Date of Birth</td><td>${fmtDate(patient.dob)} (Age: ${age(patient.dob)} years)</td></tr>
+      <tr><td>Gender</td><td>${xe(patient.gender||'Not recorded')}</td></tr>
+      <tr><td>Contact</td><td>${xe(patient.phone||'—')}${patient.email?' · '+xe(patient.email):''}</td></tr>
+      <tr><td>Referral Source</td><td>${xe(patient.referral||'Not recorded')}</td></tr>
+      <tr><td>Presenting Condition(s)</td><td>${xe(conds)}</td></tr>
+      <tr><td>Date of First Contact</td><td>${fmtDate(patient.created_at)}</td></tr>
+      <tr><td>Reporting Clinician</td><td>${xe(clinician)}</td></tr>
+    </table>
+
+    <h2>2. Background &amp; Presenting Concerns</h2>
+    <p>${xe(patient.notes||`${patName} was referred for speech-language pathology services on ${fmtDate(patient.created_at)}. The patient presents with a diagnosis of ${conds}. A full clinical history was obtained at initial consultation.`)}</p>
+
+    <h2>3. Formal Assessment Results</h2>
+    ${ptAssess.length?`<table><tr><th>Assessment Tool</th><th>Date</th><th>Score</th><th>Severity</th><th>Notes</th></tr>${ptAssess.map(a=>{
+      const t=ASSESS_TOOLS.find(x=>x.id===a.tool_id);
+      let ddExtra='';
+      if(a.dropdowns&&Object.keys(a.dropdowns).length){
+        const ddLines=Object.entries(a.dropdowns).map(([qid,val])=>{
+          const q=(t?t.sections:[]).flatMap(s=>s.questions).find(x=>x.id===qid);
+          return q?`${q.label}: ${val}`:'';
+        }).filter(Boolean);
+        if(ddLines.length)ddExtra='<br><small style="color:#4A4A6A">'+ddLines.join(' | ')+'</small>';
+      }
+      return`<tr><td>${t?xe(t.name):a.tool_id}</td><td>${fmtDate(a.date)}</td><td>${a.total}</td><td><strong>${xe(a.severity)}</strong></td><td>${xe(a.notes||'—')}${ddExtra}</td></tr>`;
+    }).join('')}</table>`
+    :'<p>No formal screening assessments recorded for this patient.</p>'}
+
+    <h2>4. Treatment Goals</h2>
+    ${goals.length?'<table><tr><th>Goal</th><th>Priority</th><th>Progress</th><th>Status</th><th>Target Date</th></tr>'+goals.map(function(g){return'<tr><td>'+xe(g.text)+'</td><td>'+g.priority+'</td><td>'+g.progress+'%</td><td><strong>'+g.status+'</strong></td><td>'+fmtDate(g.target_date)+'</td></tr>';}).join('')+'</table>'
+    :'<p>No formal treatment goals recorded yet. Goals should be established using SMART objectives at the next session.</p>'}
+
+    <h2>5. Therapy Sessions — Summary Log</h2>
+    ${sessions.length?`
+      <p>The following ${sessions.length} session(s) are included in this report, spanning ${fmtDate(sessions[0].date)} to ${fmtDate(sessions[sessions.length-1].date)}. Total therapy time: <strong>${totalHrs} hours</strong>.</p>
+      <table><tr><th>Date</th><th>Session Focus</th><th>Duration</th><th>Score</th><th>Progress</th></tr>
+        ${sessions.map(s=>`<tr><td>${fmtDate(s.date)}</td><td>${xe(s.title)}</td><td>${s.duration} min</td><td>${s.score!=null?s.score+'%':'—'}</td><td>${xe(s.progress||'—')}</td></tr>`).join('')}
+      </table>
+      ${avgSc!==null?`<p>Mean exercise accuracy score: <strong>${avgSc}%</strong>.</p>`:''}`
+    :`<p>No therapy sessions have been logged for this patient yet. This report has been generated based on the initial assessment and patient registration data. Sessions should be logged following each consultation.</p>`}
+
+    <h2>6. Clinical Impressions &amp; Progress</h2>
+    ${sessions.length?`
+      <p>${domProg?`Over the course of the reported period, ${xe(patName)} ${PDESC[domProg]||'showed variable progress'}.`:'Progress across the reported period is detailed in the session log above.'}</p>
+      ${sessions.slice(-3).reverse().map(s=>`<p><strong>${fmtDate(s.date)} — ${xe(s.title)}.</strong> ${xe(s.notes||'No detailed notes recorded.')}${s.homework?' <em>Home practice: '+xe(s.homework)+'</em>':''}</p>`).join('')}`
+    :'<p>Clinical impressions will be documented following the commencement of therapy sessions. '+(ptAssess.length?'Initial screening results are detailed in Section 3 above.':'')+' '+(patient.notes?'Referring clinician notes: '+xe(patient.notes):'')+' </p>'}
+
+    <h2>7. Attendance &amp; Compliance</h2>
+    ${appts.length?`<p>Sessions attended: <strong>${attended}</strong> of <strong>${appts.length}</strong> scheduled (attendance rate: <strong>${attRate}%</strong>). No-shows: ${noshow}.</p>
+    <table><tr><th>Date</th><th>Time</th><th>Type</th><th>Status</th></tr>
+      ${appts.slice(0,12).sort((a,b)=>b.date.localeCompare(a.date)).map(a=>`<tr><td>${fmtDate(a.date)}</td><td>${a.time||'—'}</td><td>${a.type}</td><td><strong>${a.status}</strong></td></tr>`).join('')}
+    </table>`
+    :'<p>No appointment records have been entered for this patient yet.</p>'}
+
+    <h2>8. Recommendations</h2>
+    <ul>${[...new Set(recList)].map(r=>`<li>${xe(r)}</li>`).join('')}</ul>
+
+    <h2>9. Plan for Next Review</h2>
+    <p>It is recommended that ${xe(patName)} ${sessions.length?'continue with':'commence'} scheduled speech-language therapy sessions. A formal review should be conducted within ${rtype==='discharge'?'3 months post-discharge':'8–12 weeks'}, at which time goals will be established and evaluated.${rtype==='discharge'?' The patient has been provided a home maintenance programme and advised to re-refer if difficulties re-emerge.':''}</p>
+
+    <h2>10. Clinical Glossary</h2>
+    <p>Key clinical terms used in this report:</p>
+    <dl>${gterms.slice(0,8).map(([t,d])=>`<dt>${xe(t)}</dt><dd>${xe(d)}</dd>`).join('')}</dl>
+    <div style="margin-top:36px;padding-top:16px;border-top:1px solid #DDD8D0;font-size:13px;color:#8888A8">
+      <p>Prepared by: <strong>${xe(clinician)}</strong>${clinic?', '+xe(clinic):''}</p>
+      <p>Date: ${fmtDate(today())}</p>
+      <p><em>This report is confidential and intended for use by qualified healthcare professionals.</em></p>
+    </div>`;
+
+  document.getElementById('cr-out').style.display='block';
+  document.getElementById('cr-content').innerHTML=html;
+  document.getElementById('cr-content').scrollIntoView({behavior:'smooth',block:'start'});
+  window._lastReportType='standard';
+  toast('✅ Report generated!');
+}
+
+function printReport(){
+  const c=document.getElementById('cr-content').innerHTML;
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><title>Clinical Report</title><style>body{font-family:'Times New Roman',serif;font-size:12pt;line-height:1.7;margin:2cm;}h2{font-size:14pt;border-bottom:1pt solid #333;margin:18pt 0 6pt;padding-bottom:3pt;}p{margin-bottom:8pt;}table{width:100%;border-collapse:collapse;margin:8pt 0;font-size:11pt;}th{background:#2A7F7F;color:white;padding:5pt 8pt;text-align:left;}td{padding:5pt 8pt;border-bottom:.5pt solid #ccc;}dl{margin:8pt 0;}dt{font-weight:bold;margin-top:6pt;}dd{margin-left:16pt;font-style:italic;}ul{margin:6pt 0 10pt 20pt;}li{margin-bottom:4pt;}@media print{body{margin:1.5cm;}}</style></head><body>${c}</body></html>`);
+  w.document.close(); w.print();
+}
+
+// ═══════════════════════════════════════════════
+//  DOCX DOWNLOAD (JSZip + raw Open XML)
+// ═══════════════════════════════════════════════
+function xe2(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');}
+
+function dRun(text,opts={}){
+  const rpr=[opts.bold?'<w:b/>':'',opts.italic?'<w:i/>':'',opts.color?'<w:color w:val="'+opts.color+'"/>':'','<w:sz w:val="'+(opts.size||22)+'" /><w:szCs w:val="'+(opts.size||22)+'" />','<w:rFonts w:ascii="'+(opts.font||'Arial')+'" w:hAnsi="'+(opts.font||'Arial')+'" />'].join('');
+  return'<w:r><w:rPr>'+rpr+'</w:rPr><w:t xml:space="preserve">'+xe2(text)+'</w:t></w:r>';
+}
+
+function dPara(content,opts={}){
+  const ppr=[opts.style?'<w:pStyle w:val="'+opts.style+'"/>':'','<w:spacing w:before="'+((opts.spacing&&opts.spacing.before)||0)+'" w:after="'+((opts.spacing&&opts.spacing.after)||160)+'"/>',opts.align?'<w:jc w:val="'+opts.align+'"/>':'',opts.numId?'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="'+opts.numId+'"/></w:numPr>':'',opts.border?'<w:pBdr><w:bottom w:val="single" w:sz="4" w:space="4" w:color="2A7F7F"/></w:pBdr>':''].join('');
+  return'<w:p><w:pPr>'+ppr+'</w:pPr>'+(typeof content==='string'?content:content.join(''))+'</w:p>';
+}
+
+function dH1(text){return dPara(dRun(text,{bold:true,size:28,color:'1D5C5C'}),{style:'Heading1',spacing:{before:280,after:120},border:true});}
+function dBody(text,opts={}){return dPara(dRun(text,{size:22,...opts}),{spacing:{after:120}});}
+function dSpacer(){return`<w:p><w:pPr><w:spacing w:after="80"/></w:pPr></w:p>`;}
+function dBullet(text){return dPara(dRun(text,{size:22}),{numId:1,spacing:{after:80}});}
+
+function dTable(headers,rows,widths){
+  const tw=widths.reduce((a,b)=>a+b,0);
+  const border='<w:top w:val="single" w:sz="1" w:color="CCCCCC"/><w:bottom w:val="single" w:sz="1" w:color="CCCCCC"/><w:left w:val="single" w:sz="1" w:color="CCCCCC"/><w:right w:val="single" w:sz="1" w:color="CCCCCC"/>';
+  const cell=(text,w,hdr,alt)=>`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="${hdr?'1D5C5C':alt?'F7F4EF':'FFFFFF'}"/><w:tcBorders>${border}</w:tcBorders><w:tcMar><w:top w:w="80" w:type="dxa"/><w:bottom w:w="80" w:type="dxa"/><w:left w:w="120" w:type="dxa"/><w:right w:w="120" w:type="dxa"/></w:tcMar></w:tcPr><w:p><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="20"/><w:szCs w:val="20"/>${hdr?'<w:b/>':''}<w:color w:val="${hdr?'FFFFFF':'1A1A2E'}"/></w:rPr><w:t xml:space="preserve">${xe2(text)}</w:t></w:r></w:p></w:tc>`;
+  const hrow=`<w:tr><w:trPr><w:tblHeader/></w:trPr>${headers.map((h,i)=>cell(h,widths[i],true,false)).join('')}</w:tr>`;
+  const drows=rows.map((row,ri)=>`<w:tr>${row.map((c,ci)=>cell(String(c==null?'—':c),widths[ci],false,ri%2===1)).join('')}</w:tr>`).join('');
+  return'<w:tbl><w:tblPr><w:tblW w:w="'+tw+'" w:type="dxa"/><w:tblBorders>'+border+'</w:tblBorders></w:tblPr><w:tblGrid>'+widths.map(function(w){return'<w:gridCol w:w="'+w+'"/>';}).join('')+'</w:tblGrid>'+hrow+drows+'</w:tbl><w:p><w:pPr><w:spacing w:after="120"/></w:pPr></w:p>';
+}
+
+async function loadJSZip(){
+  if(window.JSZip)return window.JSZip;
+  return new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload=()=>res(window.JSZip); s.onerror=rej;
+    document.head.appendChild(s);
+  });
+}
+
+async function downloadDocx(){
+  const pid=document.getElementById('cr-pat')?.value;
+  const content=document.getElementById('cr-content')?.innerText?.trim();
+  if(!pid||!content){toast('⚠️ Please generate a report first.');return;}
+  toast('⏳ Building .docx…');
+  let JSZip; try{JSZip=await loadJSZip();}catch(e){toast('❌ JSZip failed to load. Check internet connection.');return;}
+
+  const {data:patient}=await sb.from('patients').select('*').eq('id',pid).single();
+  const selIds=[...document.querySelectorAll('.cr-cb:checked')].map(cb=>cb.value);
+  const {data:_ss}=await sb.from('sessions').select('*').eq('patient_id',pid);
+  const sessions=(_ss||[]).filter(s=>selIds.includes(s.id)).sort((a,b)=>a.date.localeCompare(b.date));
+  const {data:_gg}=await sb.from('goals').select('*').eq('patient_id',pid);
+  const goals=_gg||[];
+  const {data:_aa}=await sb.from('appointments').select('*').eq('patient_id',pid);
+  const appts=_aa||[];
+  const {data:_as}=await sb.from('assessments').select('*').eq('patient_id',pid);
+  const assessments=_as||[];
+  const rtype=document.getElementById('cr-type').value;
+  const addressee=document.getElementById('cr-to').value.trim();
+  const clinician=document.getElementById('cr-cli').value.trim()||'Speech-Language Pathologist';
+  const clinic=document.getElementById('cr-clinic').value.trim();
+  const patName=patient.fname+' '+patient.lname;
+  const attended=appts.filter(a=>a.status==='completed').length;
+  const noshow=appts.filter(a=>a.status==='no-show').length;
+  const attRate=appts.length?Math.round(attended/appts.length*100):null;
+  const avgSc=sessions.filter(s=>s.score!=null).length?Math.round(sessions.filter(s=>s.score!=null).reduce((a,b,_,ar)=>a+b.score/ar.length,0)):null;
+  const totalHrs=(sessions.reduce((a,b)=>a+(b.duration||45),0)/60).toFixed(1);
+  const conds=(patient.conditions||[]).map(c=>COND_LABELS[c]||c).join(', ')||'Not specified';
+  const RTITLES={progress:'Speech-Language Therapy Progress Report',initial:'Initial SLP Assessment Report',discharge:'Discharge Summary — Speech-Language Therapy',referral:'Referral Letter — SLP',review:'Periodic Review Report — Speech-Language Therapy'};
+  const pcnt={}; sessions.forEach(s=>{if(s.progress)pcnt[s.progress]=(pcnt[s.progress]||0)+1;});
+  const domProg=Object.entries(pcnt).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  const PDESC={Excellent:'demonstrated excellent progress, consistently exceeding expected therapeutic benchmarks',Good:'demonstrated good progress, meeting the majority of short-term objectives',Moderate:'demonstrated moderate progress, with incremental gains noted',Limited:'demonstrated limited progress; response to intervention has been variable',Regression:'demonstrated regression in one or more target areas'};
+  const RECS2={stuttering:['Continue fluency shaping and/or stuttering modification techniques.','Gradual transfer of fluency skills to increasingly challenging contexts.','Re-administer SSI-4 at next review.'],articulation:['Continue phoneme-specific intervention systematically.','Implement minimal pair therapy.','Reassess intelligibility and PCC at next review.'],language:['Target receptive and/or expressive language deficits.','Engage caregivers in facilitation strategies.','Re-administer language assessment at next review.'],voice:['Continue vocal hygiene programme.','Refer to ENT for laryngoscopic evaluation.','Reassess using VHI-10 at next review.'],aphasia:['Continue multi-modal communication strategies.','Family/caregiver training strongly recommended.','Review functional communication goals each session.']};
+  const recList2=[]; (patient.conditions||[]).forEach(c=>{if(RECS2[c])recList2.push(...RECS2[c]);});
+  if(!recList2.length)recList2.push('Continue current therapy and reassess goals at next review.');
+  const GLOS2={stuttering:[['Stuttering','A fluency disorder characterised by repetitions, prolongations, and blocks.'],['Fluency Shaping','Therapeutic approach targeting speech motor patterns.'],['%SS','Percentage of syllables containing a stuttering moment.']],articulation:[['Articulation Disorder','Errors in phoneme production: substitutions, omissions, distortions.'],['PCC','Percentage of consonants produced correctly in a speech sample.'],['Intelligibility','Degree to which a listener understands the speaker.']],language:[['Language Delay','Language milestones significantly behind age-expected norms.'],['Receptive Language','Ability to understand spoken, written, or gestural language.'],['Expressive Language','Ability to communicate through words, sentences, or writing.']],voice:[['Dysphonia','Condition where voice quality, pitch, or loudness deviates from typical.'],['Vocal Hygiene','Behaviours maintaining vocal fold health.'],['Phonation','Sound production through vocal fold vibration.']],aphasia:[['Aphasia','Acquired language disorder resulting from brain damage, most commonly stroke.'],['Anomia','Difficulty retrieving specific words.'],['AAC','Augmentative & Alternative Communication strategies and devices.']]};
+  const gterms2=[]; const seen2=new Set();
+  (patient.conditions||[]).forEach(c=>(GLOS2[c]||[]).forEach(([t,d])=>{if(!seen2.has(t)){seen2.add(t);gterms2.push([t,d]);}}));
+  if(!gterms2.length)gterms2.push(['Speech-Language Pathology','Assessment and treatment of communication and swallowing disorders.']);
+
+  const body=[];
+  if(clinic)body.push(dPara(dRun(clinic.toUpperCase(),{bold:true,size:20,color:'2A7F7F'}),{align:'center',spacing:{after:80}}));
+  body.push(dPara(dRun(RTITLES[rtype]||'Clinical Report',{bold:true,size:34,color:'1A1A2E'}),{align:'center',spacing:{after:80}}));
+  body.push(dPara(dRun(`Date: ${fmtDate(today())}${addressee?'  |  To: '+addressee:''}`,{size:20,color:'8888A8'}),{align:'center',spacing:{after:40},border:true}));
+  body.push(dSpacer());
+  body.push(dH1('1. Patient Information'));
+  body.push(dTable(['Field','Details'],[['Full Name',patName],['Date of Birth',`${fmtDate(patient.dob)} (Age: ${age(patient.dob)} years)`],['Gender',patient.gender||'Not recorded'],['Contact',(patient.phone||'—')+(patient.email?'  |  '+patient.email:'')],['Referral',patient.referral||'Not recorded'],['Conditions',conds],['First Contact',fmtDate(patient.created_at)],['Clinician',clinician]],[3000,6026]));
+  body.push(dSpacer());
+  body.push(dH1('2. Background & Presenting Concerns'));
+  body.push(dBody(patient.notes||`${patName} was referred on ${fmtDate(patient.created_at)}. Presenting diagnosis: ${conds}.`));
+  body.push(dSpacer());
+  body.push(dH1('3. Formal Assessment Results'));
+  if(assessments.length){body.push(dTable(['Tool','Date','Score','Severity','Notes'],assessments.map(a=>{const t=ASSESS_TOOLS.find(x=>x.id===a.tool_id);return[t?t.name:a.tool_id,fmtDate(a.date),String(a.total),a.severity,a.notes||'—'];}),(ASSESS_TOOLS?[2800,1200,700,1400,2926]:[1800,1200,700,1400,3926])));}
+  else{body.push(dBody('No formal assessments recorded during this period.'));}
+  body.push(dSpacer());
+  body.push(dH1('4. Treatment Goals'));
+  if(goals.length){body.push(dTable(['Goal','Priority','Progress','Status','Target'],[...goals.map(g=>[g.text,g.priority,g.progress+'%',g.status,fmtDate(g.target_date)])],[3826,1000,900,1100,1200]));}
+  else{body.push(dBody('No formal goals recorded.'));}
+  body.push(dSpacer());
+  body.push(dH1('5. Session Log'));
+  body.push(dBody(`${sessions.length} session(s) from ${sessions.length?fmtDate(sessions[0].date):'—'} to ${sessions.length?fmtDate(sessions[sessions.length-1].date):'—'}. Total: ${totalHrs} hours.`));
+  if(sessions.length){body.push(dTable(['Date','Focus','Duration','Score','Progress'],sessions.map(s=>[fmtDate(s.date),s.title,s.duration+' min',s.score!=null?s.score+'%':'—',s.progress||'—']),[1400,3226,1100,1000,1300]));}
+  if(avgSc!==null)body.push(dBody(`Mean exercise accuracy: ${avgSc}%.`));
+  body.push(dSpacer());
+  body.push(dH1('6. Clinical Impressions'));
+  body.push(dBody(domProg?`Over the reported period, ${patName} ${PDESC[domProg]||'showed variable progress'}.`:'Progress was variable across the reported period.'));
+  sessions.slice(-3).reverse().forEach(s=>{
+    body.push(dPara([dRun(`${fmtDate(s.date)} — ${s.title}. `,{bold:true,size:22}),dRun((s.notes||'No notes recorded.')+(s.homework?' Home practice: '+s.homework:''),{size:22})].join(''),{spacing:{after:120}}));
+  });
+  body.push(dSpacer());
+  body.push(dH1('7. Attendance'));
+  if(appts.length){
+    body.push(dBody(`Attended: ${attended}/${appts.length} (${attRate}%). No-shows: ${noshow}.`));
+    body.push(dTable(['Date','Time','Type','Status'],appts.slice(0,12).sort((a,b)=>b.date.localeCompare(a.date)).map(a=>[fmtDate(a.date),a.time||'—',a.type,a.status]),[1800,1000,2400,1826]));
+  }else{body.push(dBody('No appointment records.'));}
+  body.push(dSpacer());
+  body.push(dH1('8. Recommendations'));
+  [...new Set(recList2)].forEach(r=>body.push(dBullet(r)));
+  body.push(dSpacer());
+  body.push(dH1('9. Next Review'));
+  body.push(dBody(`${patName} should continue therapy. Review in ${rtype==='discharge'?'3 months post-discharge':'8–12 weeks'}.`));
+  body.push(dSpacer());
+  body.push(dH1('10. Clinical Glossary'));
+  gterms2.slice(0,8).forEach(([t,d])=>{
+    body.push(dPara([dRun(t+': ',{bold:true,size:22,color:'1D5C5C'}),dRun(d,{italic:true,size:22})].join(''),{spacing:{after:100}}));
+  });
+  body.push(dSpacer());
+  body.push(dPara(dRun(`Prepared by: ${clinician}${clinic?', '+clinic:''}`,{size:20,color:'4A4A6A'}),{spacing:{before:400,after:80},border:true}));
+  body.push(dBody(`Date: ${fmtDate(today())}`,{color:'4A4A6A'}));
+  body.push(dBody('Confidential. For use by qualified healthcare professionals only.',{italic:true,color:'8888A8',size:18}));
+
+  const docXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const stylesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults><w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal"/><w:pPr><w:spacing w:after="160"/></w:pPr><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="Heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="280" w:after="120"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="28"/><w:color w:val="1D5C5C"/></w:rPr></w:style></w:styles>`;
+  const numXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="1"><w:multiLevelType w:val="hybridMultilevel"/><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="&#x2022;"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol"/></w:rPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num></w:numbering>`;
+  const relsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/></Relationships>`;
+  const appRels=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const ctypes=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>`;
+
+  try{
+    const zip=new JSZip();
+    zip.file('[Content_Types].xml',ctypes);
+    zip.file('_rels/.rels',appRels);
+    zip.file('word/document.xml',docXml);
+    zip.file('word/styles.xml',stylesXml);
+    zip.file('word/numbering.xml',numXml);
+    zip.file('word/_rels/document.xml.rels',relsXml);
+    const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`ClinicalReport_${patName.replace(/\s+/g,'_')}_${today()}.docx`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('✅ Word document downloaded!');
+  }catch(err){toast('❌ Download failed: '+err.message);console.error(err);}
+}
+
+// ── MURIELLE BASELINE SLT .DOCX DOWNLOAD ──────────
+// ── DATA EXPORT ───────────────────────────────────
+async function exportData(){
+  toast('⏳ Preparing export…');
+  var {data}=await sb.rpc('export_therapist_data',{therapist_uuid:curUser.id});
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download='speechpro_export_'+today()+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('✅ Data exported!');
+}
+
+async function requestDelete(){
+  if(!confirm('Are you sure you want to delete your account and ALL your data? This cannot be undone.'))return;
+  if(!confirm('FINAL WARNING: All patient data will be permanently deleted. Continue?'))return;
+  toast('⏳ Deleting account…');
+  await sb.auth.signOut();
+  toast('Account deletion requested. Contact support to complete.');
+}
+
+// Init patient modal button
+document.querySelector('[onclick="openModal(\'m-patient\')"]').setAttribute('onclick','openAddPatient()');
+</script>
+</body>
+</html>
